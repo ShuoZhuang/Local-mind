@@ -62,7 +62,11 @@ class ChatService:
                             hit.id,
                             hit.text,
                             hit.score,
-                            {"knowledge_base_id": fallback_id, **hit.metadata},
+                            {
+                                "knowledge_base_id": fallback_id,
+                                **({"knowledge_base_name": knowledge_base_names[fallback_id]} if knowledge_base_names and fallback_id in knowledge_base_names else {}),
+                                **hit.metadata,
+                            },
                         )
                         if not hit.metadata.get("knowledge_base_id") else hit
                         for hit in hits
