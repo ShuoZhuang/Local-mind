@@ -47,6 +47,7 @@ class ChatSession:
     model_id: str
     created_at: str
     updated_at: str
+    knowledge_base_ids: list[str] = field(default_factory=list)
 
     @classmethod
     def new(cls, knowledge_base_id: str, model_id: str) -> "ChatSession":
@@ -58,20 +59,35 @@ class ChatSession:
             model_id=model_id,
             created_at=timestamp,
             updated_at=timestamp,
+            knowledge_base_ids=[knowledge_base_id],
         )
+
+    def selected_knowledge_base_ids(self) -> list[str]:
+        candidates = self.knowledge_base_ids or [self.knowledge_base_id]
+        return list(dict.fromkeys(str(item).strip() for item in candidates if str(item).strip()))
+
+    def set_knowledge_base_ids(self, ids: list[str]) -> None:
+        cleaned = list(dict.fromkeys(str(item).strip() for item in ids if str(item).strip()))
+        if not cleaned:
+            raise ValueError("至少选择一个知识库")
+        self.knowledge_base_ids = cleaned
+        self.knowledge_base_id = cleaned[0]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ChatSession":
+        legacy_id = str(data["knowledge_base_id"])
+        selected_ids = data.get("knowledge_base_ids") or [legacy_id]
         return cls(
             id=str(data["id"]),
             title=str(data.get("title", "新对话")),
-            knowledge_base_id=str(data["knowledge_base_id"]),
+            knowledge_base_id=legacy_id,
             model_id=str(data["model_id"]),
             created_at=str(data["created_at"]),
             updated_at=str(data["updated_at"]),
+            knowledge_base_ids=list(selected_ids),
         )
 
 

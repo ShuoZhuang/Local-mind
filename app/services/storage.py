@@ -49,7 +49,7 @@ class LocalStateStore:
 
     def delete_sessions_for_knowledge_base(self, knowledge_base_id: str) -> None:
         for session in self.list_sessions():
-            if session.knowledge_base_id == knowledge_base_id:
+            if knowledge_base_id in session.selected_knowledge_base_ids():
                 self.delete_session(session.id)
 
     def rename_knowledge_base(self, knowledge_base_id: str, name: str) -> None:

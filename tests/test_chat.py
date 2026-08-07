@@ -12,6 +12,9 @@ class FakeRetrieval:
     def search(self, knowledge_base_id, query, top_k=5):
         return self.hits[:top_k]
 
+    def search_many(self, knowledge_base_ids, query, top_k=5, knowledge_base_names=None):
+        return self.hits[:top_k]
+
 
 class FakeLLM:
     def __init__(self):
@@ -55,6 +58,24 @@ def test_chat_service_includes_sources_and_question_in_prompt():
     assert "什么是 Embedding？" in prompt[-1]["content"]
     assert "Embedding 可以把文本转换成向量" in prompt[-1]["content"]
     assert events[1].payload[0]["file_name"] == "embedding.md"
+
+
+def test_chat_service_accepts_multiple_knowledge_bases_and_cites_the_selected_one():
+    hit = SearchHit("chunk-1", "资料内容", 0.91, {"file_name": "notes.md"})
+    retrieval = FakeRetrieval([hit])
+    llm = FakeLLM()
+    service = ChatService(retrieval, lambda model_id: llm)
+
+    events = list(service.answer(
+        "问题",
+        ["kb-ai", "kb-rag"],
+        "qwen-1.5b",
+        [],
+        knowledge_base_names={"kb-ai": "AI 笔记", "kb-rag": "RAG 笔记"},
+    ))
+
+    assert events[1].payload[0]["knowledge_base_id"] in {"kb-ai", "kb-rag"}
+    assert events[1].payload[0]["knowledge_base_name"] in {"AI 笔记", "RAG 笔记"}
 
 
 def test_chat_service_marks_missing_context_in_prompt():

@@ -22,7 +22,10 @@ class CitationCard(QFrame):
         score = citation.get("score")
         score_text = f"相似度 {score:.2f}" if isinstance(score, (int, float)) else ""
 
-        self.title = QLabel(f"{index}. {citation.get('file_name', '未知来源')}")
+        knowledge_base_name = str(citation.get("knowledge_base_name") or "").strip()
+        source_name = str(citation.get("file_name", "未知来源"))
+        title = f"{index}. {knowledge_base_name} · {source_name}" if knowledge_base_name else f"{index}. {source_name}"
+        self.title = QLabel(title)
         self.title.setObjectName("CitationTitle")
         self.title.setWordWrap(True)
         self.score = QLabel(score_text)
@@ -87,6 +90,27 @@ class CitationPanel(QWidget):
             self.source_list.setItemWidget(item, card)
             self._resize_citation_item(item, card)
             QTimer.singleShot(0, lambda current_item=item, current_card=card: self._resize_citation_item(current_item, current_card))
+
+    def select_citation(self, document_id: str | None) -> None:
+        if not document_id:
+            return
+        for index in range(self.source_list.count()):
+            card = self.source_list.itemWidget(self.source_list.item(index))
+            if card is not None:
+                card.setProperty("selected", False)
+                card.style().unpolish(card)
+                card.style().polish(card)
+        for index in range(self.source_list.count()):
+            item = self.source_list.item(index)
+            if str(item.data(32) or "") == str(document_id):
+                self.source_list.setCurrentItem(item)
+                self.source_list.scrollToItem(item, QListWidget.ScrollHint.PositionAtCenter)
+                card = self.source_list.itemWidget(item)
+                if card is not None:
+                    card.setProperty("selected", True)
+                    card.style().unpolish(card)
+                    card.style().polish(card)
+                break
 
     def _resize_citation_item(self, item: QListWidgetItem, card: CitationCard) -> None:
         available_width = max(150, self.source_list.viewport().width() - 8)

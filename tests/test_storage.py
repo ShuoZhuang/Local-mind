@@ -86,6 +86,19 @@ def test_deleting_knowledge_base_records_removes_documents_and_sessions(tmp_path
     assert store.list_sessions() == []
 
 
+def test_deleting_knowledge_base_records_removes_multi_knowledge_base_sessions(tmp_path):
+    store = LocalStateStore(tmp_path)
+    first = store.create_knowledge_base("第一库")
+    second = store.create_knowledge_base("第二库")
+    session = ChatSession.new(first.id, "qwen-1.5b")
+    session.set_knowledge_base_ids([first.id, second.id])
+    store.save_session(session, [])
+
+    store.delete_sessions_for_knowledge_base(second.id)
+
+    assert store.list_sessions() == []
+
+
 def test_last_used_chunking_config_round_trips(tmp_path):
     store = LocalStateStore(tmp_path)
     config = ChunkingConfig(strategy_id="hierarchical", max_length=600, overlap_percent=15)

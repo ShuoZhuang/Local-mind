@@ -40,6 +40,7 @@ class MainWindow(QMainWindow):
             self.state.create_knowledge_base("我的第一个知识库", "上传文档开始建立本地知识库")
         self.model_registry = ModelRegistry(self.config.state_dir / "models.json")
         self.current_knowledge_base_id = initial_knowledge_base_id or self.state.list_knowledge_bases()[0].id
+        self.current_knowledge_base_ids = [self.current_knowledge_base_id]
         self.current_model_id = self.model_registry.list_models()[0].id
         self.current_session: ChatSession | None = None
         self.current_messages: list[ChatMessage] = []
@@ -97,6 +98,8 @@ class MainWindow(QMainWindow):
         self.sidebar.chat_page_requested.connect(self.show_chat_page)
         self.chat_page.send_requested.connect(self.receive_query)
         self.chat_page.stop_requested.connect(self.stop_generation)
+        self.chat_page.knowledge_bases_changed.connect(self._set_chat_knowledge_bases)
+        self.chat_page.citations_requested.connect(self._show_selected_citations)
         self.knowledge_page.file_import_requested.connect(self.import_file)
         self.knowledge_page.file_selected.connect(self._show_import_settings)
         self.knowledge_page.document_selected.connect(self.open_document_detail)
@@ -117,6 +120,7 @@ class MainWindow(QMainWindow):
 
     def select_knowledge_base(self, knowledge_base_id: str):
         self.current_knowledge_base_id = knowledge_base_id
+        self.current_knowledge_base_ids = [knowledge_base_id]
         item = next((item for item in self.state.list_knowledge_bases() if item.id == knowledge_base_id), None)
         if item:
             self.chat_page.set_knowledge_base(item.name)
@@ -124,6 +128,7 @@ class MainWindow(QMainWindow):
             self.knowledge_page.set_documents(self.state.list_documents(knowledge_base_id))
             self.knowledge_page.set_chunking_config(self.state.load_chunking_default())
             self.knowledge_overview_panel.set_knowledge_base(name=item.name, document_count=len(self.state.list_documents(knowledge_base_id)))
+        self._refresh_chat_knowledge_bases()
 
     def open_knowledge_base(self, knowledge_base_id: str):
         self.select_knowledge_base(knowledge_base_id)
@@ -191,6 +196,7 @@ class MainWindow(QMainWindow):
         self._pending_citations = []
         self._pending_tool_calls = []
         self.chat_page.messages.clear()
+        self._refresh_chat_knowledge_bases()
         self.chat_page.set_session_title(self.current_session.title)
         self.state.save_session(self.current_session, [])
         self.sidebar.refresh()
@@ -206,8 +212,11 @@ class MainWindow(QMainWindow):
         self.current_session = session
         self.current_messages = messages
         self.current_knowledge_base_id = session.knowledge_base_id
+        self.current_knowledge_base_ids = session.selected_knowledge_base_ids()
         self.current_model_id = session.model_id
         self.select_knowledge_base(session.knowledge_base_id)
+        self.current_knowledge_base_ids = session.selected_knowledge_base_ids()
+        self._refresh_chat_knowledge_bases()
         self.chat_page.set_session_title(session.title)
         self.chat_page.display_messages(messages)
         self.sidebar.activate_chat_context(session.id)
@@ -226,9 +235,10 @@ class MainWindow(QMainWindow):
         service = self._chat_service()
         iterator = service.answer(
             text,
-            self.current_knowledge_base_id,
+            self.current_knowledge_base_ids,
             self.current_model_id,
             self.current_messages[:-1],
+            knowledge_base_names=self._knowledge_base_names(),
         )
         worker = StreamWorker(iterator)
         self._active_stream_worker = worker
@@ -301,6 +311,33 @@ class MainWindow(QMainWindow):
     def _open_citation_document(self, document_id: str):
         self.open_knowledge_base(self.current_knowledge_base_id)
         self.open_document_detail(document_id)
+
+    def _show_selected_citations(self, citations: list[dict]) -> None:
+        self._pending_citations = list(citations)
+        self.citation_panel.set_citations(self._pending_citations)
+        self.context_stack.setCurrentWidget(self.citation_panel)
+
+    def _set_chat_knowledge_bases(self, knowledge_base_ids: list[str]) -> None:
+        if not knowledge_base_ids:
+            return
+        available = {item.id for item in self.state.list_knowledge_bases()}
+        selected = [item for item in knowledge_base_ids if item in available]
+        if not selected:
+            return
+        self.current_knowledge_base_ids = selected
+        self.current_knowledge_base_id = selected[0]
+        if self.current_session:
+            self.current_session.set_knowledge_base_ids(selected)
+            self.state.save_session(self.current_session, self.current_messages)
+        names = self._knowledge_base_names()
+        self.chat_page.subtitle.setText("回答将参考：" + "、".join(names[item] for item in selected if item in names))
+
+    def _knowledge_base_names(self) -> dict[str, str]:
+        return {item.id: item.name for item in self.state.list_knowledge_bases()}
+
+    def _refresh_chat_knowledge_bases(self) -> None:
+        options = [(item.id, item.name) for item in self.state.list_knowledge_bases()]
+        self.chat_page.set_knowledge_bases(options, self.current_knowledge_base_ids)
 
     def reprocess_document(self, document_id: str):
         try:
@@ -408,7 +445,7 @@ class MainWindow(QMainWindow):
         if answer != QMessageBox.StandardButton.Yes:
             return
         cleanup_errors = self._delete_knowledge_base_data(knowledge_base_id)
-        if self.current_session and self.current_session.knowledge_base_id == knowledge_base_id:
+        if self.current_session and knowledge_base_id in self.current_session.selected_knowledge_base_ids():
             self.current_session = None
             self.current_messages = []
             self.chat_page.messages.clear()

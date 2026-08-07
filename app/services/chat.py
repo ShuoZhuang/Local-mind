@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from collections.abc import Sequence
 from typing import Any, Iterator, Literal
 
 from app.models import ChatMessage, SearchHit
@@ -24,9 +25,10 @@ class ChatService:
     def answer(
         self,
         query: str,
-        knowledge_base_id: str,
+        knowledge_base_id: str | Sequence[str],
         model_id: str,
         history: list[ChatMessage],
+        knowledge_base_names: dict[str, str] | None = None,
     ) -> Iterator[ChatEvent]:
         invocation = CalculatorRouter.route(query)
         if invocation is not None:
@@ -43,7 +45,28 @@ class ChatService:
             return
 
         yield ChatEvent("status", "正在检索知识库…")
-        hits = self.retrieval.search(knowledge_base_id, query, top_k=5)
+        if isinstance(knowledge_base_id, str):
+            hits = self.retrieval.search(knowledge_base_id, query, top_k=5)
+        else:
+            hits = self.retrieval.search_many(
+                knowledge_base_id,
+                query,
+                top_k=5,
+                knowledge_base_names=knowledge_base_names,
+            )
+            if hits and isinstance(knowledge_base_id, Sequence):
+                fallback_id = next((str(item) for item in knowledge_base_id if str(item).strip()), None)
+                if fallback_id:
+                    hits = [
+                        SearchHit(
+                            hit.id,
+                            hit.text,
+                            hit.score,
+                            {"knowledge_base_id": fallback_id, **hit.metadata},
+                        )
+                        if not hit.metadata.get("knowledge_base_id") else hit
+                        for hit in hits
+                    ]
         citations = [self._citation(hit) for hit in hits]
         yield ChatEvent("citation", citations)
         context = self._context(hits)
@@ -63,6 +86,8 @@ class ChatService:
             "score": hit.score,
             "text": hit.text,
             "document_id": hit.metadata.get("document_id"),
+            "knowledge_base_id": hit.metadata.get("knowledge_base_id"),
+            "knowledge_base_name": hit.metadata.get("knowledge_base_name"),
         }
 
     @staticmethod

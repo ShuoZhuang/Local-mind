@@ -186,6 +186,7 @@ def test_chat_page_renders_tool_call_after_assistant_message():
     assert tool_widget.objectName() == "ToolCallLabel"
     assert "2+2" in tool_widget.text()
     assert page.messages.item(1).sizeHint().height() >= 72
+    assert tool_widget.styleSheet() == ""
     page.close()
     application.processEvents()
 
@@ -257,6 +258,51 @@ def test_citation_panel_wraps_results_without_a_horizontal_scrollbar():
     assert panel.source_list.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
     assert panel.source_list.itemWidget(panel.source_list.item(0)) is not None
     assert panel.source_list.item(0).sizeHint().height() > 48
+    panel.close()
+    application.processEvents()
+
+
+def test_chat_page_exposes_multi_knowledge_base_menu_and_selection_signal():
+    application = QApplication.instance() or QApplication([])
+    page = ChatPage()
+    page.set_knowledge_bases(
+        [("kb-ai", "AI 笔记"), ("kb-rag", "RAG 笔记")],
+        ["kb-ai"],
+    )
+
+    assert page.options_button.objectName() == "ChatOptionsButton"
+    actions = page.options_button.menu().actions()
+    assert any(action.text() == "全选" for action in actions)
+    assert any(action.text() == "AI 笔记" for action in actions)
+    page.close()
+    application.processEvents()
+
+
+def test_chat_page_source_line_emits_citation_payload():
+    application = QApplication.instance() or QApplication([])
+    page = ChatPage()
+    citation = {"file_name": "notes.md", "document_id": "doc-1"}
+    spy = QSignalSpy(page.citations_requested)
+
+    page.append_citations([citation])
+    page.messages.itemWidget(page.messages.item(0)).click()
+
+    assert spy.count() == 1
+    assert spy.at(0)[0][0]["document_id"] == "doc-1"
+    page.close()
+    application.processEvents()
+
+
+def test_citation_panel_can_select_matching_document():
+    application = QApplication.instance() or QApplication([])
+    panel = CitationPanel()
+    panel.set_citations([
+        {"file_name": "one.md", "document_id": "doc-1"},
+        {"file_name": "two.md", "document_id": "doc-2"},
+    ])
+    panel.select_citation("doc-2")
+
+    assert panel.source_list.currentItem().data(32) == "doc-2"
     panel.close()
     application.processEvents()
 

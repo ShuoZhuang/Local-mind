@@ -329,12 +329,86 @@ git add app/ui/chat_page.py app/ui/theme.py tests/test_ui_smoke.py
 git commit -m "style: render tool calls as status rows"
 \`\`\`
 
+### Task 5.5: 对话工作台视觉与轻量动效优化
+
+**Files:**
+- Modify: \`app/ui/chat_page.py: header, source rows, tool rows, entry animation helper\`
+- Modify: \`app/ui/context_panels.py: citation panel hierarchy and selected state\`
+- Modify: \`app/ui/theme.py: dark palette, menu, source row, tool row, spacing\`
+- Test: \`tests/test_ui_smoke.py\`
+- Test: \`tests/test_workspace.py\`
+
+**Interfaces:**
+- Keep the PySide6 implementation; do not add React, GSAP, npm, or browser runtime dependencies.
+- Add a small Qt animation helper for newly inserted source/tool rows. It may animate only opacity and a small transform-like visual property, must keep animation objects alive until completion, and must not animate list width/height/top/left on every frame.
+- Use one short timeline-like sequence for a new assistant response: assistant content appears first, then source row/tool status row; no animation should run for the entire message history on reload.
+- The right citation panel keeps a stable width and no horizontal scrollbar; its active citation card receives a visible selected state.
+- The three-dot button and menu must have a clear hover/pressed/focus state and remain keyboard reachable.
+
+- [ ] **Step 1: Write the failing visual-contract tests**
+
+\`\`\`python
+def test_chat_page_uses_distinct_options_button_and_source_row_style():
+    page = ChatPage()
+    assert page.knowledge_options_button.objectName() == "ChatOptionsButton"
+    page.append_citations([{"file_name": "学习笔记.md", "document_id": "doc-1"}])
+    source_row = page.messages.itemWidget(page.messages.item(0))
+    assert source_row.objectName() == "CitationLink"
+    assert source_row.minimumHeight() >= 28
+
+
+def test_citation_panel_marks_the_selected_card():
+    panel = CitationPanel()
+    panel.set_citations([{"file_name": "学习笔记.md", "document_id": "doc-1"}])
+    panel.select_citation("doc-1")
+    card = panel.source_list.itemWidget(panel.source_list.item(0))
+    assert card.property("selected") is True
+\`\`\`
+
+Add a style assertion that \`ToolCallLabel\` contains no filled background or rounded border and that the source row uses the same dark palette accent as the rest of the chat workspace.
+
+- [ ] **Step 2: Run the visual-contract tests to verify they fail**
+
+\`\`\`powershell
+.\\.venv\\Scripts\\python.exe -m pytest -p no:anyio tests/test_ui_smoke.py tests/test_workspace.py -k "distinct_options_button or selected_card or visual_contract" -v
+\`\`\`
+
+Expected: FAIL because the current page has no finalized selector object contract, no selected citation API, and no visual polish contract.
+
+- [ ] **Step 3: Write the minimal visual implementation**
+
+Use a restrained dark palette: one mint accent, one cool border tone, and transparent list backgrounds. Improve hierarchy with consistent 8/12/16px spacing, a compact options button, a menu section label, a source row with a small leading marker and hover underline, and a tool row with a thin accent rail. Use \`QPropertyAnimation\` only for a 140–180ms opacity entrance on the newly inserted row; retain references and stop/release them on completion. Do not add ScrollTrigger because the desktop application has no DOM scroll lifecycle; preserve native scrolling and call no animation from resize handlers.
+
+- [ ] **Step 4: Run the visual-contract tests to verify they pass**
+
+\`\`\`powershell
+.\\.venv\\Scripts\\python.exe -m pytest -p no:anyio tests/test_ui_smoke.py tests/test_workspace.py -k "distinct_options_button or selected_card or visual_contract" -v
+\`\`\`
+
+Expected: PASS.
+
+- [ ] **Step 5: Run the focused UI regression suite**
+
+\`\`\`powershell
+.\\.venv\\Scripts\\python.exe -m pytest -p no:anyio tests/test_ui_smoke.py tests/test_workspace.py -v
+\`\`\`
+
+Expected: PASS with the existing bubble, wrapping, right-rail width, source, tool, and menu tests preserved.
+
+- [ ] **Step 6: Commit**
+
+\`\`\`powershell
+git add app/ui/chat_page.py app/ui/context_panels.py app/ui/theme.py tests/test_ui_smoke.py tests/test_workspace.py
+git commit -m "style: polish chat workspace hierarchy and motion"
+\`\`\`
+
+
 ### Task 6: 端到端回归与验收
 
 **Files:**
 - Modify: \`tests/test_chat.py\` only if an existing compatibility assertion needs the documented string-input adapter.
 - Modify: \`tests/test_ui_smoke.py\` only if the new public UI behavior needs an additional regression case.
-- Verify: all changed production and test files from Tasks 1–5.
+- Verify: all changed production and test files from Tasks 1–5.5.
 
 **Interfaces:**
 - No new production interfaces. This task validates the complete path from menu selection to retrieval to citation click.

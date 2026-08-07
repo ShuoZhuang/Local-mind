@@ -47,15 +47,22 @@ QFrame#ContextRail { background: #141b25; border-left: 1px solid #273447; }
 QFrame#Card { border: 1px solid #273447; border-radius: 12px; background: #161d27; }
 QFrame#UserBubble { border: 1px solid #5aa88e; border-radius: 12px; background: #21483d; margin: 0; }
 QFrame#AssistantBubble { border: 1px solid #4b6684; border-radius: 12px; background: #1d2938; margin: 0; }
-QLabel#CitationLabel { color: #91a0b5; padding: 8px 12px; }
-QLabel#ToolCallLabel { color: #b7d8cf; padding: 9px 12px; border: 1px solid #31594f; border-radius: 9px; background: #172a28; }
+QFrame#UserBubble:hover { border-color: #87dfc3; background: #285447; }
+QFrame#AssistantBubble:hover { border-color: #6f8eaf; background: #223247; }
+QWidget#CitationLink { background: transparent; }
+QLabel#CitationLabel { color: #8fb9c7; padding: 8px 12px; }
+QWidget#CitationLink:hover QLabel#CitationLabel { color: #b9f3e0; }
+QLabel#ToolCallLabel { color: #8fb6aa; padding: 9px 10px 9px 18px; border: 0; border-left: 2px solid #4c8f7f; background: transparent; }
 QWidget#CitationCard { border: 1px solid #273447; border-radius: 10px; background: #161d27; }
+QWidget#CitationCard[selected="true"] { border-color: #87dfc3; background: #1a302c; }
 QLabel#CitationTitle { color: #dbe7f4; font-weight: 700; }
 QLabel#CitationPreview { color: #aebccd; }
 QWidget#DocumentListCard { border: 1px solid #273447; border-radius: 10px; background: #161d27; }
 QMenu { border: 1px solid #334258; border-radius: 10px; padding: 5px; background: #1c2531; color: #eaf1f7; }
 QMenu::item { padding: 7px 24px 7px 10px; border-radius: 6px; }
 QMenu::item:selected { background: #285549; }
+QPushButton#ChatOptionsButton { min-width: 34px; max-width: 34px; min-height: 30px; max-height: 30px; padding: 0; border-color: transparent; background: transparent; color: #91a0b5; font-size: 20px; }
+QPushButton#ChatOptionsButton:hover { color: #eaf1f7; background: #1c2531; border-color: #334258; }
 QScrollBar:vertical { width: 12px; background: #111a24; border-left: 1px solid #2d3b4f; margin: 0; }
 QScrollBar::handle:vertical { min-height: 40px; border-radius: 5px; background: #647b96; }
 QScrollBar::handle:vertical:hover { background: #87dfc3; }

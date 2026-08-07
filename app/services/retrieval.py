@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 from app.models import SearchHit
 
@@ -17,13 +17,44 @@ class RetrievalService:
         self.store_factory = store_factory
 
     def search(self, knowledge_base_id: str, query: str, top_k: int = 5) -> list[SearchHit]:
+        return self.search_many([knowledge_base_id], query, top_k=top_k)
+
+    def search_many(
+        self,
+        knowledge_base_ids: Sequence[str],
+        query: str,
+        top_k: int = 5,
+        knowledge_base_names: Mapping[str, str] | None = None,
+    ) -> list[SearchHit]:
         if not query.strip() or top_k <= 0:
             return []
-        store = self.store_factory(knowledge_base_id)
-        if store.count == 0:
+        ids = list(dict.fromkeys(str(item).strip() for item in knowledge_base_ids if str(item).strip()))
+        if not ids:
+            return []
+        stores = []
+        for knowledge_base_id in ids:
+            try:
+                store = self.store_factory(knowledge_base_id)
+                if store.count:
+                    stores.append((knowledge_base_id, store))
+            except Exception:
+                continue
+        if not stores:
             return []
         vector = self.embedder.encode_query(query)
-        return store.query(vector, top_k=top_k)
+        merged: list[SearchHit] = []
+        for knowledge_base_id, store in stores:
+            try:
+                hits = store.query(vector, top_k=top_k)
+            except Exception:
+                continue
+            for hit in hits:
+                metadata = dict(hit.metadata)
+                metadata.setdefault("knowledge_base_id", knowledge_base_id)
+                if knowledge_base_names and knowledge_base_id in knowledge_base_names:
+                    metadata.setdefault("knowledge_base_name", knowledge_base_names[knowledge_base_id])
+                merged.append(SearchHit(hit.id, hit.text, hit.score, metadata))
+        return rank_by_similarity(merged, top_k=top_k)
 
 
 def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
