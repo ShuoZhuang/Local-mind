@@ -1,11 +1,15 @@
 .venv/
 .venv_gpu/
+.idea/
+.superpowers/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 build/
 dist/
 *.spec
+models/
+*.log
 data/documents/
 data/chroma_db/
 data/models/
