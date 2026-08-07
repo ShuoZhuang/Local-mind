@@ -1,0 +1,69 @@
+<h2>知识库管理：先选择整体结构</h2>
+<p class="subtitle">你会经常做的事情是：查看知识库 → 添加文档 → 调整分割 → 检查索引状态 → 删除或重新处理文档。下面比较三种页面组织方式。</p>
+
+<div class="cards">
+  <div class="card" data-choice="A" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">A · 双栏工作台</div>
+        <div class="mockup-body" style="padding:0; display:flex; min-height:300px">
+          <div style="width:34%; padding:14px; background:#151d2d; border-right:1px solid #38445d">
+            <div class="label">知识库</div>
+            <div style="padding:10px; border:1px solid #6ee7c0; border-radius:8px; margin:8px 0 18px">人工智能学习</div>
+            <div class="label">文档</div>
+            <div style="padding:9px 0">● Embedding笔记.md</div>
+            <div style="padding:9px 0">● Transformer.pdf</div>
+            <div style="padding:9px 0; color:#f6ad55">◐ 新文档.docx · 处理中</div>
+            <button class="mock-button" style="margin-top:18px">＋ 添加文档</button>
+          </div>
+          <div style="flex:1; padding:16px">
+            <div class="label">当前知识库</div>
+            <h3 style="margin:6px 0">人工智能学习</h3>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin:16px 0">
+              <span class="placeholder" style="padding:8px">12 个文档</span>
+              <span class="placeholder" style="padding:8px">384 个片段</span>
+              <span class="placeholder" style="padding:8px">E5 Embedding</span>
+            </div>
+            <div class="placeholder" style="height:92px">右侧显示选中文档详情、分割配置、重新索引和错误日志</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>推荐：双栏工作台</h3><p>文档列表常驻左侧，右侧显示详情和操作；最适合你现在这种“多个知识库、持续添加文档”的使用方式。</p></div>
+  </div>
+
+  <div class="card" data-choice="B" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">B · 导入向导</div>
+        <div class="mockup-body" style="min-height:300px; padding:18px">
+          <div style="display:flex; justify-content:space-between; color:#8fa0bd"><span style="color:#6ee7c0">1 选择文件</span><span>2 分割方式</span><span>3 建立索引</span></div>
+          <div style="margin:32px 0; padding:25px; border:1px dashed #60708d; border-radius:12px; text-align:center">拖入文件，或点击选择<br><button class="mock-button" style="margin-top:14px">选择文档</button></div>
+          <div class="placeholder" style="height:54px">下一步：选择自动分割或手动分割</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>流程清晰：导入向导</h3><p>新手容易理解，每次上传都按步骤完成；但查看历史文档、重命名或批量管理会比较绕。</p></div>
+  </div>
+
+  <div class="card" data-choice="C" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">C · 数据看板</div>
+        <div class="mockup-body" style="min-height:300px; padding:16px">
+          <div style="display:flex; gap:8px; margin-bottom:15px"><div class="placeholder" style="flex:1; padding:12px">文档总数<br><strong>12</strong></div><div class="placeholder" style="flex:1; padding:12px">片段总数<br><strong>384</strong></div><div class="placeholder" style="flex:1; padding:12px">索引状态<br><strong style="color:#6ee7c0">正常</strong></div></div>
+          <div class="placeholder" style="height:42px; margin-bottom:10px">搜索文档、来源或状态　　筛选 ▾　排序 ▾</div>
+          <div style="padding:11px 0; border-bottom:1px solid #38445d">Embedding笔记.md　　已索引　　···</div>
+          <div style="padding:11px 0; border-bottom:1px solid #38445d">Transformer.pdf　　　已索引　　···</div>
+          <div style="padding:11px 0">新文档.docx　　　　　处理中　···</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>信息丰富：数据看板</h3><p>适合文档很多时搜索、筛选、批量处理；但对当前项目来说可能略重，配置入口需要额外设计。</p></div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>请先选择你更喜欢的整体方向</h3>
+  <p class="subtitle">可以点击一个方案；如果你想要“主要像 A，但加入 B 的导入步骤”，也可以直接告诉我。</p>
+</div>

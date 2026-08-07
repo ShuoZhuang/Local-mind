@@ -1,0 +1,43 @@
+<h2>B + C：知识库管理融合方案</h2>
+<p class="subtitle">平时停留在 C 的管理看板；点击“添加文档”后，在右侧展开 B 的导入流程。这样既能管理历史文档，也能让首次导入足够清晰。</p>
+
+<div class="mockup" style="margin-bottom:22px">
+  <div class="mockup-header">知识库管理 · 人工智能学习</div>
+  <div class="mockup-body" style="padding:0; display:flex; min-height:560px">
+    <div style="width:57%; padding:18px; border-right:1px solid #38445d">
+      <div style="display:flex; justify-content:space-between; align-items:start">
+        <div><div class="label">当前知识库</div><h3 style="margin:5px 0">人工智能学习</h3></div>
+        <button class="mock-button">＋ 添加文档</button>
+      </div>
+      <div style="display:flex; gap:8px; margin:16px 0">
+        <div class="placeholder" style="flex:1; padding:12px">文档<br><strong>12</strong></div>
+        <div class="placeholder" style="flex:1; padding:12px">片段<br><strong>384</strong></div>
+        <div class="placeholder" style="flex:1; padding:12px">索引<br><strong style="color:#6ee7c0">正常</strong></div>
+      </div>
+      <div style="display:flex; gap:8px; margin-bottom:14px"><input class="mock-input" style="flex:1" placeholder="搜索文档名称或来源"><button class="mock-button">筛选 ▾</button></div>
+      <div style="padding:12px 0; border-bottom:1px solid #38445d"><strong>文档</strong><span style="float:right">片段　状态　操作</span></div>
+      <div style="padding:14px 0; border-bottom:1px solid #38445d">Embedding笔记.md <span style="float:right">32　已索引　···</span></div>
+      <div style="padding:14px 0; border-bottom:1px solid #38445d">Transformer.pdf <span style="float:right">86　已索引　···</span></div>
+      <div style="padding:14px 0; border-bottom:1px solid #38445d; color:#f6ad55">新文档.docx <span style="float:right">—　处理中　···</span></div>
+      <div style="padding:14px 0; color:#8fa0bd">课程资料.docx <span style="float:right">45　已索引　···</span></div>
+    </div>
+    <div style="width:43%; padding:18px; background:#151d2d">
+      <div style="display:flex; justify-content:space-between"><div><div class="label">导入文档</div><h3 style="margin:5px 0">添加到人工智能学习</h3></div><span style="color:#8fa0bd">×</span></div>
+      <div style="display:flex; justify-content:space-between; margin:22px 0 18px; color:#8fa0bd"><span style="color:#6ee7c0">① 选择文件</span><span>② 分割方式</span><span>③ 建立索引</span></div>
+      <div style="padding:14px; border:1px dashed #60708d; border-radius:10px; text-align:center">网络安全综合考试题.docx<br><span style="font-size:12px; color:#8fa0bd">已选择 · 2.4 MB</span></div>
+      <div style="margin-top:18px"><div class="label">分割方式</div><div style="display:flex; gap:8px; margin:8px 0 12px"><button class="mock-button" style="flex:1; border-color:#6ee7c0">自动分割</button><button class="mock-button" style="flex:1">手动分割</button></div><div class="placeholder" style="padding:12px; line-height:1.8">自动识别段落和标题<br><span style="color:#8fa0bd">预计生成约 54 个片段</span></div></div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:30px"><button class="mock-button">取消</button><button class="mock-button" style="border-color:#6ee7c0">下一步：建立索引 →</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>这个融合方案的核心逻辑</h3>
+  <p>① 看板负责“管理已有内容”；② 导入抽屉负责“完成一次新文档流程”；③ 文档处理失败时，列表中的状态直接变成失败，并可点击查看错误详情；④ 点击某个文档后，右侧抽屉切换成“文档详情”，而不是把页面跳走。</p>
+</div>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="keep-drawer" onclick="toggleSelect(this)"><div class="letter">A</div><div class="content"><h3>采用右侧抽屉</h3><p>推荐。看板不离开，导入流程在右侧完成，最适合持续管理。</p></div></div>
+  <div class="option" data-choice="full-page" onclick="toggleSelect(this)"><div class="letter">B</div><div class="content"><h3>导入时切换到独立页面</h3><p>流程更宽敞，但导入过程中看不到完整文档列表。</p></div></div>
+  <div class="option" data-choice="detail-drawer" onclick="toggleSelect(this)"><div class="letter">C</div><div class="content"><h3>抽屉同时承担详情和导入</h3><p>点击文档看详情，点击添加文档进入导入；页面结构保持一致。</p></div></div>
+</div>

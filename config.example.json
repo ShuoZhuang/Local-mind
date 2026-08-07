@@ -1,0 +1,12 @@
+{
+  "embedding_model": "intfloat/multilingual-e5-small",
+  "default_model": {
+    "id": "qwen2.5-1.5b",
+    "display_name": "Qwen2.5 1.5B",
+    "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
+    "provider": "transformers"
+  },
+  "retrieval_top_k": 5,
+  "max_new_tokens": 512
+}
+

@@ -1,0 +1,38 @@
+<h2>文档详情页：查看、检查、重新处理</h2>
+<p class="subtitle">点击列表中的文档后，右侧抽屉切换成详情；左侧看板保持不动，方便继续浏览其他文档。</p>
+
+<div class="mockup" style="margin-bottom:22px">
+  <div class="mockup-header">知识库管理 · 人工智能学习</div>
+  <div class="mockup-body" style="padding:0; display:flex; min-height:600px">
+    <div style="width:52%; padding:18px; border-right:1px solid #38445d">
+      <div style="display:flex; justify-content:space-between; align-items:center"><h3>文档列表</h3><button class="mock-button">＋ 添加文档</button></div>
+      <div class="placeholder" style="padding:10px; margin:12px 0">搜索文档　　状态 ▾　来源 ▾</div>
+      <div style="padding:13px 10px; background:#24344a; border-radius:8px; border-left:3px solid #6ee7c0"><strong>网络安全综合考试题.docx</strong><br><span style="color:#8fa0bd; font-size:12px">54 个片段 · 已索引 · 刚刚</span></div>
+      <div style="padding:14px 10px; border-bottom:1px solid #38445d">Embedding笔记.md<br><span style="color:#8fa0bd; font-size:12px">32 个片段 · 已索引</span></div>
+      <div style="padding:14px 10px; border-bottom:1px solid #38445d">Transformer.pdf<br><span style="color:#8fa0bd; font-size:12px">86 个片段 · 已索引</span></div>
+      <div style="padding:14px 10px; color:#f6ad55">课程资料.docx<br><span style="font-size:12px">处理中 · 预计还需 12 秒</span></div>
+    </div>
+    <div style="width:48%; padding:18px; background:#151d2d">
+      <div style="display:flex; justify-content:space-between; align-items:start"><div><div class="label">文档详情</div><h3 style="margin:5px 0">网络安全综合考试题.docx</h3></div><span style="color:#8fa0bd">×</span></div>
+      <div style="display:flex; gap:7px; flex-wrap:wrap; margin:14px 0"><span class="placeholder" style="padding:7px">已索引</span><span class="placeholder" style="padding:7px">54 个片段</span><span class="placeholder" style="padding:7px">DOCX</span></div>
+      <div class="label" style="margin-top:18px">文件信息</div>
+      <div style="line-height:2; color:#c4cde0; font-size:13px">文件大小：2.4 MB<br>导入时间：2026-08-06 14:20<br>来源：G:\资料\网络安全综合考试题.docx</div>
+      <div class="label" style="margin-top:18px">分段策略</div>
+      <div class="placeholder" style="padding:11px; line-height:1.8">自定义 · 分隔符：换行<br>最大长度：800 字符　重叠：10%<br><span style="color:#6ee7c0">预处理：已规范空白</span></div>
+      <div class="label" style="margin-top:18px">片段预览</div>
+      <div class="placeholder" style="padding:11px; line-height:1.7; max-height:86px; overflow:hidden">片段 01 · 网络安全综合考试题<br>一、单项选择题……<br>片段 02 · 以下哪项属于网络安全基本要求……</div>
+      <div style="display:flex; gap:8px; margin-top:22px"><button class="mock-button" style="flex:1">查看全部片段</button><button class="mock-button" style="flex:1; border-color:#6ee7c0">重新处理</button><button class="mock-button" style="color:#ff8b8b">删除</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>详情页的职责</h3>
+  <p>它不负责直接编辑原文，而是帮助你确认“这个文档有没有正确进入知识库”：查看原文件信息、实际采用的分段规则、片段数量和片段预览；如果效果不好，点击“重新处理”并选择新的策略。</p>
+</div>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="preview-chunks" onclick="toggleSelect(this)"><div class="letter">A</div><div class="content"><h3>需要“查看全部片段”页面</h3><p>打开独立列表，可以搜索片段并查看每个片段的来源页码。</p></div></div>
+  <div class="option" data-choice="preview-sample" onclick="toggleSelect(this)"><div class="letter">B</div><div class="content"><h3>只保留片段预览</h3><p>详情页只展示前几个片段，界面更轻量。</p></div></div>
+  <div class="option" data-choice="reprocess-confirm" onclick="toggleSelect(this)"><div class="letter">C</div><div class="content"><h3>重新处理前显示影响范围</h3><p>明确提示会删除旧片段并重新建立向量索引，避免误操作。</p></div></div>
+</div>

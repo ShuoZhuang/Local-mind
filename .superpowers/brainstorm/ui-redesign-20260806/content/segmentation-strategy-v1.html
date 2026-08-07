@@ -1,0 +1,45 @@
+<h2>选择分段策略</h2>
+<p class="subtitle">为“网络安全综合考试题.docx”选择处理方式。系统会记住你的上次选择，但每次上传都可以重新调整。</p>
+
+<div class="options">
+  <div class="option" data-choice="auto" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content"><h3>自动分段与清洗</h3><p>自动识别段落、标题和空白，并在片段过长时自动拆分。</p><span class="label">适合：普通笔记、结构不确定的文档</span></div>
+  </div>
+  <div class="option" data-choice="custom" onclick="toggleSelect(this)" style="border-color:#6ee7c0">
+    <div class="letter">●</div>
+    <div class="content"><h3>自定义</h3><p>自己指定分隔符、片段长度、重叠度和预处理规则。</p><span class="label">当前选择 · 上次使用：换行 / 800 字符 / 10%</span></div>
+  </div>
+  <div class="option" data-choice="hierarchical" onclick="toggleSelect(this)">
+    <div class="letter">○</div>
+    <div class="content"><h3>按层级分段 <span style="color:#6ee7c0; font-size:12px">推荐</span></h3><p>保留章节、标题和子标题关系，并把标题路径保存到片段元数据中。</p><span class="label">适合：Word、Markdown、课程讲义和规章制度</span></div>
+  </div>
+</div>
+
+<div class="mockup" style="margin-top:20px">
+  <div class="mockup-header">自定义参数</div>
+  <div class="mockup-body" style="padding:22px">
+    <div class="split">
+      <div>
+        <div class="label">分段标识符</div>
+        <div class="mock-input" style="padding:12px; margin:6px 0 16px">换行　⌄</div>
+        <div class="label">分段最大长度（字符）</div>
+        <div class="mock-input" style="padding:12px; margin:6px 0 16px">800</div>
+        <div class="label">分段重叠度</div>
+        <div class="mock-input" style="padding:12px; margin:6px 0 16px">10%</div>
+      </div>
+      <div>
+        <div class="label">文本预处理规则</div>
+        <div class="placeholder" style="padding:14px; line-height:2.2; margin-top:6px">☑ 替换连续空格、换行和制表符<br>☐ 删除 URL 和电子邮箱地址<br>☑ 保留标题和页码信息</div>
+        <div class="label" style="margin-top:18px">处理预览</div>
+        <div class="placeholder" style="padding:14px; line-height:1.7">预计生成：54 个片段<br><span style="color:#6ee7c0">片段 01 · 单项选择题</span><br>片段 02 · 网络安全基本要求……</div>
+      </div>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px"><button class="mock-button">返回</button><button class="mock-button" style="border-color:#6ee7c0">确认并建立索引 →</button></div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>交互逻辑</h3>
+  <p>点击“自动分段与清洗”或“按层级分段”时，下方只展示策略说明和预估结果；点击“自定义”时才展开详细参数。这样页面默认不会显得复杂，但你需要精细控制时可以完整调整。</p>
+</div>

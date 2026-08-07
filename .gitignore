@@ -1,0 +1,13 @@
+.venv/
+.venv_gpu/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+build/
+dist/
+*.spec
+data/documents/
+data/chroma_db/
+data/models/
+data/state/
+*.broken
