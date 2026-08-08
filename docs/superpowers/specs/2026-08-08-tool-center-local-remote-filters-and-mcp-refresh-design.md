@@ -16,15 +16,15 @@
 
 ## MCP 配置变更刷新
 
-`MCPServerDialog.servers_changed` 继续触发主窗口的 MCP 刷新入口。该入口无论是否仍有启用 Server，都必须在后台调用 `ToolRegistry.refresh_mcp_tools()` 并在完成后调用 `_refresh_registered_tools()`。
+`MCPServerDialog.servers_changed` 继续触发主窗口的 MCP 刷新入口。有启用 Server 时，该入口在后台调用 `ToolRegistry.refresh_mcp_tools()`；没有启用 Server 时，直接同步清空注册表并刷新卡片，因为此时没有外部发现 I/O。两条路径都会在完成后调用 `_refresh_registered_tools()`。
 
-`refresh_mcp_tools()` 先清空内存中的 MCP 工具与 Server 缓存，再仅发现启用 Server 的工具。故当最后一个 Server 被停用时，刷新完成后注册表不再暴露旧 MCP 工具，工具中心随之移除远程工具卡片。
+`refresh_mcp_tools()` 先清空内存中的 MCP 工具与 Server 缓存，再仅发现启用 Server 的工具。故当最后一个 Server 被停用时，刷新完成后注册表不再暴露旧 MCP 工具，工具中心随之移除远程工具卡片。无启用 Server 时采用同步清理路径，避免为无 I/O 操作创建短生命周期 Qt 线程。
 
 ## 测试
 
 - 工具中心测试覆盖五个筛选按钮的准确顺序，以及本地工具、远程工具、本地能力和已启用视图的可见集合。
 - 注册表测试继续确保本地工具为 `kind="tool"`、MCP 工具为 `kind="mcp"`。
-- 主窗口回归测试复现“停用最后一个 MCP Server”：配置变更触发刷新后，注册表和工具中心均不再包含该 MCP 工具。
+- 主窗口回归测试复现“停用最后一个 MCP Server”：配置变更触发刷新后，注册表和工具中心均不再包含该 MCP 工具，并验证无启用 Server 时不会创建后台发现线程。
 
 ## 范围与约束
 
