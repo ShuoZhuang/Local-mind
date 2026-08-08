@@ -3,6 +3,7 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QWidget
 from PySide6.QtTest import QSignalSpy
 
@@ -12,6 +13,7 @@ from app.ui.context_panels import KnowledgeImportPanel
 from app.ui.context_panels import ImportProgressPanel
 from app.models import ChunkingConfig, DocumentChunk, DocumentRecord
 from app.ui.context_panels import DocumentDetailPanel
+from app.ui.chat_page import ChatPage
 
 
 def test_workspace_switches_context_visibility():
@@ -22,10 +24,10 @@ def test_workspace_switches_context_visibility():
     shell.set_context_visible(False, animate=False)
     assert shell.context_is_visible is False
     assert shell.context_container.isHidden()
-    assert not shell.context_expand_button.isHidden()
+    assert shell.context_expand_button.text() == "›"
     shell.context_expand_button.click()
     assert shell.context_is_visible is True
-    assert shell.context_expand_button.isHidden()
+    assert shell.context_expand_button.text() == "‹"
     shell.close()
     application.processEvents()
 
@@ -69,6 +71,21 @@ def test_citation_panel_shows_actual_sources():
     assert "学生守则.docx" in card.title.text()
     assert "0.81" in card.score.text()
     panel.close()
+    application.processEvents()
+
+
+def test_citation_link_click_is_not_consumed_by_selectable_label():
+    application = QApplication.instance() or QApplication([])
+    page = ChatPage()
+    page.append_citations([{"document_id": "doc-1", "file_name": "学生守则.docx", "text": "第一条"}], animate=False)
+    link = page.messages.itemWidget(page.messages.item(0))
+    assert link is not None
+    assert link.label.textInteractionFlags().value == Qt.TextInteractionFlag.NoTextInteraction.value
+    spy = QSignalSpy(page.citations_requested)
+    link.click()
+    assert spy.count() == 1
+    assert spy.at(0)[0][0]["document_id"] == "doc-1"
+    page.close()
     application.processEvents()
 
 
@@ -125,5 +142,24 @@ def test_document_detail_panel_exposes_original_and_chunk_previews():
 
     assert panel.preview_tabs.count() == 2
     assert "第一段内容" in panel.chunk_list.item(0).text()
+    panel.close()
+    application.processEvents()
+
+
+def test_document_detail_panel_emits_chunk_delete_request_from_context_menu():
+    application = QApplication.instance() or QApplication([])
+    record = DocumentRecord.new("kb-1", "讲义.docx", "hash", ChunkingConfig())
+    panel = DocumentDetailPanel()
+    panel.set_document(record, [DocumentChunk("chunk-1", "第一段内容")])
+    spy = QSignalSpy(panel.chunk_delete_requested)
+
+    menu = panel.chunk_context_menu_for_row(0)
+    action = next(action for action in menu.actions() if action.text() == "从知识库移除")
+    action.trigger()
+
+    assert spy.count() == 1
+    assert spy.at(0)[0] == record.id
+    assert spy.at(0)[1] == "chunk-1"
+    menu.deleteLater()
     panel.close()
     application.processEvents()

@@ -6,7 +6,7 @@ from PySide6.QtCore import QTimer, QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QPushButton, QProgressBar, QSpinBox, QStackedWidget, QTabWidget, QTextEdit,
-    QVBoxLayout, QWidget,
+    QVBoxLayout, QWidget, QMenu,
 )
 
 from app.models import ChunkingConfig, DocumentChunk, DocumentRecord
@@ -279,6 +279,7 @@ class ImportProgressPanel(QWidget):
 class DocumentDetailPanel(QWidget):
     reprocess_requested = Signal(str)
     delete_requested = Signal(str)
+    chunk_delete_requested = Signal(str, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -293,6 +294,8 @@ class DocumentDetailPanel(QWidget):
         self.chunk_list = QListWidget()
         self.preview_tabs.addTab(self.preview, "原文预览")
         self.preview_tabs.addTab(self.chunk_list, "分块预览")
+        self.chunk_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.chunk_list.customContextMenuRequested.connect(self._show_chunk_menu)
         self.reprocess_button = QPushButton("重新处理")
         self.delete_button = QPushButton("删除文档")
         layout = QVBoxLayout(self)
@@ -316,4 +319,30 @@ class DocumentDetailPanel(QWidget):
         for index, chunk in enumerate(chunks, start=1):
             text = chunk.text.strip()
             summary = text[:150] + ("…" if len(text) > 150 else "")
-            self.chunk_list.addItem(f"分块 {index} · {len(text)} 字\n{summary}")
+            item = QListWidgetItem(f"分块 {index} · {len(text)} 字\n{summary}")
+            item.setData(Qt.ItemDataRole.UserRole, chunk.id)
+            self.chunk_list.addItem(item)
+
+    def chunk_context_menu_for_row(self, row: int) -> QMenu:
+        """构造分块右键菜单，便于界面事件和离屏测试复用。"""
+        menu = QMenu(self)
+        item = self.chunk_list.item(row)
+        if item is None or not self._document_id:
+            return menu
+        chunk_id = str(item.data(Qt.ItemDataRole.UserRole) or "")
+        if not chunk_id:
+            return menu
+        action = menu.addAction("从知识库移除")
+        action.triggered.connect(
+            lambda checked=False, document_id=self._document_id, identifier=chunk_id:
+            self.chunk_delete_requested.emit(document_id, identifier)
+        )
+        return menu
+
+    def _show_chunk_menu(self, position) -> None:
+        item = self.chunk_list.itemAt(position)
+        if item is None:
+            return
+        menu = self.chunk_context_menu_for_row(self.chunk_list.row(item))
+        if menu.actions():
+            menu.exec(self.chunk_list.viewport().mapToGlobal(position))
