@@ -120,6 +120,23 @@ def test_tools_button_opens_tool_center_and_keeps_library_lists(tmp_path):
     application.processEvents()
 
 
+def test_skills_button_opens_honest_empty_skills_center(tmp_path):
+    application = QApplication.instance() or QApplication([])
+    config = AppConfig.from_root(tmp_path)
+    state = LocalStateStore(config.state_dir)
+    knowledge_base = state.create_knowledge_base("人工智能学习")
+    window = MainWindow(config, state, knowledge_base.id)
+
+    window.sidebar.skill_button.click()
+
+    assert window.stack.currentWidget() is window.skills_center_page
+    assert window.context_stack.currentWidget() is window.skills_overview_panel
+    assert "尚未添加技能" in window.skills_center_page.empty_title.text()
+    assert window.sidebar.skill_button.property("active") is True
+    window.close()
+    application.processEvents()
+
+
 def test_build_window_uses_project_local_state(tmp_path):
     application = QApplication.instance() or QApplication([])
 

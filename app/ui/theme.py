@@ -24,6 +24,8 @@ QPushButton#QuietButton:hover { color: #eaf1f7; background: #1c2531; }
 QPushButton#SidebarNav { text-align: left; min-height: 34px; border-color: transparent; background: transparent; color: #aebccd; }
 QPushButton#SidebarNav:hover { border-color: #334c5d; background: #182633; color: #eaf1f7; }
 QPushButton#SidebarNav[active="true"] { border-color: #376a69; background: #193b3b; color: #dffff5; }
+QPushButton#SidebarCreateAction { min-height: 30px; padding: 5px 6px; font-size: 12px; color: #c9d9e5; background: #172231; border-color: #2c4055; }
+QPushButton#SidebarCreateAction:hover { color: #eafff8; background: #1f3b42; border-color: #73d9c1; }
 QComboBox, QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox {
     border: 1px solid #273447;
     border-radius: 10px;
@@ -49,6 +51,11 @@ QFrame#Sidebar { background: #111720; border-right: 1px solid #273447; }
 QFrame#ContextRail { background: #141b25; border-left: 1px solid #273447; }
 QFrame#Card { border: 1px solid #273447; border-radius: 12px; background: #161d27; }
 QFrame#ToolCenterPage { background: #101822; }
+QFrame#SkillsCenterPage { background: #101822; }
+QFrame#SkillsEmptyCard { border: 1px solid #2b3d50; border-radius: 16px; background: #172333; }
+QLabel#SkillsEmptyTitle { color: #eff9ff; font-size: 22px; font-weight: 700; }
+QLabel#SkillsEmptyDetail { color: #a9bacb; line-height: 1.45; }
+QFrame#SkillsOverviewPanel { background: #121d2a; border: 1px solid #2b3d50; border-radius: 14px; }
 QFrame#ToolCard { border: 1px solid #2b3d50; border-radius: 14px; background: #172333; }
 QFrame#ToolCard:hover { border-color: #537b8e; background: #1a2b3a; }
 QFrame#ToolCard[selected="true"] { border: 2px solid #73d9c1; background: #183542; }
@@ -57,6 +64,7 @@ QLabel#ToolCardTitle { color: #eff9ff; font-size: 16px; font-weight: 700; }
 QLabel#ToolCardDescription { color: #a9bacb; line-height: 1.35; }
 QLabel#ToolEnabledStatus { color: #67e39a; font-weight: 700; }
 QLabel#ToolDisabledStatus { color: #8898a9; }
+QLabel#ToolCapabilityStatus { color: #8fb9c7; }
 QPushButton#ToolFilterButton { min-height: 28px; padding: 4px 13px; border-radius: 14px; color: #9cacbd; background: #172333; }
 QPushButton#ToolFilterButton:checked { color: #eafff8; border-color: #73d9c1; background: #1b4b49; }
 QFrame#ToolDetailsPanel { background: #121d2a; border: 1px solid #2b3d50; border-radius: 14px; }
@@ -67,6 +75,8 @@ QLabel#ToolCapabilities { color: #c9e7df; padding: 8px 10px; border: 1px solid #
 QLabel#ToolExample { color: #c9f4e6; padding: 10px; border: 1px solid #2b4d5f; border-radius: 9px; background: #142331; font-family: 'Cascadia Mono', 'Consolas'; }
 QLabel#ToolSectionTitle { color: #eff7fb; font-size: 14px; font-weight: 700; }
 QLabel#ToolRecentCalls { color: #aebdca; padding: 10px; border: 1px solid #273a4c; border-radius: 9px; background: #14202d; }
+QLabel#ToolTestResult { color: #87dfc3; padding: 9px 10px; border: 1px solid #2d5b5c; border-radius: 9px; background: #152e35; }
+QLabel#ToolTestResult[success="false"] { color: #ffadad; border-color: #754c55; background: #321e27; }
 QLabel#ContextTitle { color: #f1f6fb; font-size: 19px; font-weight: 700; }
 QScrollBar:horizontal { height: 0; }
 QFrame#UserBubble { border: 1px solid #5aa88e; border-radius: 12px; background: #21483d; margin: 0; }
@@ -87,6 +97,8 @@ QMenu::item { padding: 7px 24px 7px 10px; border-radius: 6px; }
 QMenu::item:selected { background: #285549; }
 QPushButton#ChatOptionsButton { min-width: 34px; max-width: 34px; min-height: 30px; max-height: 30px; padding: 0; border-color: transparent; background: transparent; color: #91a0b5; font-size: 20px; }
 QPushButton#ChatOptionsButton:hover { color: #eaf1f7; background: #1c2531; border-color: #334258; }
+QPushButton#ContextEdgeButton { min-width: 30px; max-width: 30px; min-height: 74px; max-height: 74px; padding: 0; border: 1px solid #33485b; border-right: 0; border-radius: 10px 0 0 10px; background: #172332; color: #a8c4d2; font-size: 24px; }
+QPushButton#ContextEdgeButton:hover { background: #1e3842; border-color: #73d9c1; color: #dffff5; }
 QScrollBar:vertical { width: 12px; background: #111a24; border-left: 1px solid #2d3b4f; margin: 0; }
 QScrollBar::handle:vertical { min-height: 40px; border-radius: 5px; background: #647b96; }
 QScrollBar::handle:vertical:hover { background: #87dfc3; }

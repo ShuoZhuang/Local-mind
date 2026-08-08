@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QCheckBox,
     QFrame,
+    QHBoxLayout,
     QLabel,
     QListWidget,
     QPushButton,
@@ -21,6 +22,7 @@ class Sidebar(QFrame):
     knowledge_page_requested = Signal()
     chat_page_requested = Signal()
     tool_page_requested = Signal()
+    skill_page_requested = Signal()
     new_knowledge_base_requested = Signal()
     session_selected = Signal(str)
     rename_knowledge_base_requested = Signal(str)
@@ -42,10 +44,15 @@ class Sidebar(QFrame):
         self.session_list = QListWidget()
         self.new_session_button = QPushButton("＋ 新建对话")
         self.new_knowledge_base_button = QPushButton("＋ 新建知识库")
+        self.new_session_button.setObjectName("SidebarCreateAction")
+        self.new_knowledge_base_button.setObjectName("SidebarCreateAction")
+        self.new_session_button.setToolTip("新建对话")
+        self.new_knowledge_base_button.setToolTip("新建知识库")
         self.knowledge_button = QPushButton("▣ 知识库管理")
         self.chat_button = QPushButton("◌ 对话")
         self.tool_button = QPushButton("⚒ 工具")
-        for button in (self.chat_button, self.knowledge_button, self.tool_button):
+        self.skill_button = QPushButton("✦ 技能")
+        for button in (self.chat_button, self.knowledge_button, self.tool_button, self.skill_button):
             button.setObjectName("SidebarNav")
         self._build()
         self.refresh()
@@ -64,8 +71,12 @@ class Sidebar(QFrame):
         layout.addWidget(self.chat_button)
         layout.addWidget(self.knowledge_button)
         layout.addWidget(self.tool_button)
-        layout.addWidget(self.new_session_button)
-        layout.addWidget(self.new_knowledge_base_button)
+        layout.addWidget(self.skill_button)
+        create_actions = QHBoxLayout()
+        create_actions.setSpacing(8)
+        create_actions.addWidget(self.new_session_button, 1)
+        create_actions.addWidget(self.new_knowledge_base_button, 1)
+        layout.addLayout(create_actions)
         layout.addWidget(QLabel("我的知识库"))
         layout.addWidget(self.knowledge_base_list)
         layout.addWidget(QLabel("最近对话"))
@@ -85,6 +96,7 @@ class Sidebar(QFrame):
         self.knowledge_button.clicked.connect(self.knowledge_page_requested)
         self.chat_button.clicked.connect(self.chat_page_requested)
         self.tool_button.clicked.connect(self.tool_page_requested)
+        self.skill_button.clicked.connect(self.skill_page_requested)
         self.new_knowledge_base_button.clicked.connect(self.new_knowledge_base_requested)
 
     def refresh(self):
@@ -146,8 +158,18 @@ class Sidebar(QFrame):
         self.session_list.setCurrentRow(-1)
         self.session_list.blockSignals(False)
 
+    def activate_skill_context(self) -> None:
+        self.active_context_id = None
+        self._set_active_nav(self.skill_button)
+        self.knowledge_base_list.blockSignals(True)
+        self.knowledge_base_list.setCurrentRow(-1)
+        self.knowledge_base_list.blockSignals(False)
+        self.session_list.blockSignals(True)
+        self.session_list.setCurrentRow(-1)
+        self.session_list.blockSignals(False)
+
     def _set_active_nav(self, active_button: QPushButton) -> None:
-        for button in (self.chat_button, self.knowledge_button, self.tool_button):
+        for button in (self.chat_button, self.knowledge_button, self.tool_button, self.skill_button):
             button.setProperty("active", button is active_button)
             button.style().unpolish(button)
             button.style().polish(button)

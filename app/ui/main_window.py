@@ -24,6 +24,7 @@ from app.ui.chat_page import ChatPage
 from app.ui.context_panels import CitationPanel, DocumentDetailPanel, ImportProgressPanel, KnowledgeImportPanel, KnowledgeOverviewPanel
 from app.ui.knowledge_page import KnowledgePage
 from app.ui.sidebar import Sidebar
+from app.ui.skills_center_page import SkillsCenterPage, SkillsOverviewPanel
 from app.ui.theme import APP_STYLE
 from app.ui.tool_center_page import (
     DEFAULT_LOCAL_CAPABILITIES,
@@ -72,11 +73,13 @@ class MainWindow(QMainWindow):
         self.chat_page = ChatPage()
         self.knowledge_page = KnowledgePage()
         self.tool_center_page = ToolCenterPage()
+        self.skills_center_page = SkillsCenterPage()
         self.tool_center_page.set_tools(DEFAULT_TOOL_DEFINITIONS, DEFAULT_LOCAL_CAPABILITIES)
         self.stack = QStackedWidget()
         self.stack.addWidget(self.chat_page)
         self.stack.addWidget(self.knowledge_page)
         self.stack.addWidget(self.tool_center_page)
+        self.stack.addWidget(self.skills_center_page)
         self.context_stack = QStackedWidget()
         self.knowledge_overview_panel = KnowledgeOverviewPanel()
         self.knowledge_import_panel = KnowledgeImportPanel()
@@ -84,12 +87,14 @@ class MainWindow(QMainWindow):
         self.document_detail_panel = DocumentDetailPanel()
         self.citation_panel = CitationPanel()
         self.tool_details_panel = ToolDetailsPanel()
+        self.skills_overview_panel = SkillsOverviewPanel()
         self.context_stack.addWidget(self.knowledge_overview_panel)
         self.context_stack.addWidget(self.knowledge_import_panel)
         self.context_stack.addWidget(self.import_progress_panel)
         self.context_stack.addWidget(self.document_detail_panel)
         self.context_stack.addWidget(self.citation_panel)
         self.context_stack.addWidget(self.tool_details_panel)
+        self.context_stack.addWidget(self.skills_overview_panel)
         self.workspace = WorkspaceShell(self.sidebar, self.stack, self.context_stack)
         container = QWidget()
         layout = QHBoxLayout(container)
@@ -109,6 +114,7 @@ class MainWindow(QMainWindow):
         self.sidebar.knowledge_page_requested.connect(self.show_knowledge_page)
         self.sidebar.chat_page_requested.connect(self.show_chat_page)
         self.sidebar.tool_page_requested.connect(self.show_tool_page)
+        self.sidebar.skill_page_requested.connect(self.show_skills_page)
         self.tool_center_page.tool_selected.connect(self._show_tool_details)
         self.tool_details_panel.test_requested.connect(self._test_tool)
         self.chat_page.send_requested.connect(self.receive_query)
@@ -169,6 +175,11 @@ class MainWindow(QMainWindow):
         selected_id = self.tool_center_page.selected_tool_id()
         if selected_id:
             self._show_tool_details(selected_id)
+
+    def show_skills_page(self):
+        self.sidebar.activate_skill_context()
+        self.context_stack.setCurrentWidget(self.skills_overview_panel)
+        self.stack.setCurrentWidget(self.skills_center_page)
 
     def _show_tool_details(self, tool_id: str) -> None:
         self.tool_details_panel.set_tool(self.tool_center_page.tool(tool_id))
