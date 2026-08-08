@@ -25,9 +25,15 @@ from app.ui.context_panels import CitationPanel, DocumentDetailPanel, ImportProg
 from app.ui.knowledge_page import KnowledgePage
 from app.ui.sidebar import Sidebar
 from app.ui.theme import APP_STYLE
-from app.ui.tool_center_page import DEFAULT_TOOL_DEFINITIONS, ToolCenterPage, ToolDetailsPanel
+from app.ui.tool_center_page import (
+    DEFAULT_LOCAL_CAPABILITIES,
+    DEFAULT_TOOL_DEFINITIONS,
+    ToolCenterPage,
+    ToolDetailsPanel,
+)
 from app.ui.workspace import WorkspaceShell
 from app.ui.workers import ImportWorker, StreamWorker, WarmupWorker
+from tools.calculator import calculator_tool
 
 
 class MainWindow(QMainWindow):
@@ -66,7 +72,7 @@ class MainWindow(QMainWindow):
         self.chat_page = ChatPage()
         self.knowledge_page = KnowledgePage()
         self.tool_center_page = ToolCenterPage()
-        self.tool_center_page.set_tools(DEFAULT_TOOL_DEFINITIONS)
+        self.tool_center_page.set_tools(DEFAULT_TOOL_DEFINITIONS, DEFAULT_LOCAL_CAPABILITIES)
         self.stack = QStackedWidget()
         self.stack.addWidget(self.chat_page)
         self.stack.addWidget(self.knowledge_page)
@@ -104,6 +110,7 @@ class MainWindow(QMainWindow):
         self.sidebar.chat_page_requested.connect(self.show_chat_page)
         self.sidebar.tool_page_requested.connect(self.show_tool_page)
         self.tool_center_page.tool_selected.connect(self._show_tool_details)
+        self.tool_details_panel.test_requested.connect(self._test_tool)
         self.chat_page.send_requested.connect(self.receive_query)
         self.chat_page.stop_requested.connect(self.stop_generation)
         self.chat_page.knowledge_bases_changed.connect(self._set_chat_knowledge_bases)
@@ -116,6 +123,7 @@ class MainWindow(QMainWindow):
         self.knowledge_page.view_chunks_requested.connect(self.view_document_chunks)
         self.document_detail_panel.reprocess_requested.connect(self.reprocess_document)
         self.document_detail_panel.delete_requested.connect(self.delete_document)
+        self.document_detail_panel.chunk_delete_requested.connect(self.delete_chunk_from_knowledge_base)
         self.citation_panel.document_requested.connect(self._open_citation_document)
         self.knowledge_import_panel.confirmed.connect(self._confirm_import_settings)
         self.knowledge_import_panel.cancelled.connect(self._cancel_import_settings)
@@ -164,6 +172,19 @@ class MainWindow(QMainWindow):
 
     def _show_tool_details(self, tool_id: str) -> None:
         self.tool_details_panel.set_tool(self.tool_center_page.tool(tool_id))
+        self.workspace.set_context_visible(True)
+
+    def _test_tool(self, tool_id: str) -> None:
+        if tool_id != calculator_tool.name:
+            return
+        result = calculator_tool.run({"mode": "arithmetic", "expression": "2 + 2"})
+        if result.get("success"):
+            self.tool_details_panel.set_test_result(
+                f"测试通过：2 + 2 = {result.get('result')}"
+            )
+        else:
+            message = result.get("error", {}).get("message", "未知错误")
+            self.tool_details_panel.set_test_result(f"测试失败：{message}", success=False)
 
     def select_model(self, model_id: str):
         self.current_model_id = model_id
@@ -335,6 +356,7 @@ class MainWindow(QMainWindow):
         self._pending_citations = list(citations)
         self.citation_panel.set_citations(self._pending_citations)
         self.context_stack.setCurrentWidget(self.citation_panel)
+        self.workspace.set_context_visible(True)
 
     def _set_chat_knowledge_bases(self, knowledge_base_ids: list[str]) -> None:
         if not knowledge_base_ids:
@@ -410,6 +432,30 @@ class MainWindow(QMainWindow):
             pass
         self.state.delete_document_record(document_id)
         self.knowledge_page.set_documents(self.state.list_documents(record.knowledge_base_id))
+
+    def delete_chunk_from_knowledge_base(self, document_id: str, chunk_id: str) -> None:
+        """仅从当前检索索引移除分块，保留原始文档以便重新处理恢复。"""
+        try:
+            record = self.state.get_document(document_id)
+        except KeyError:
+            return
+        answer = QMessageBox.question(
+            self,
+            "从知识库移除分块",
+            "这会让该分块不再参与检索。原始文档会保留，可通过“重新处理”恢复。是否继续？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        store = self._store_factory(record.knowledge_base_id)
+        if not store.delete_chunk(chunk_id):
+            QMessageBox.warning(self, "移除失败", "未找到该分块，未进行删除。")
+            return
+        record.chunk_count = len(store.get_document_chunks(record.id))
+        self.state.save_document(record)
+        self.knowledge_page.set_documents(self.state.list_documents(record.knowledge_base_id))
+        self.open_document_detail(record.id)
 
     def view_document_chunks(self, document_id: str):
         try:

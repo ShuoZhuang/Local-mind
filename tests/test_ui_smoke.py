@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from app.config import AppConfig
 from app.main import build_window
-from app.models import ChatSession, ChunkingConfig, DocumentRecord
+from app.models import ChatSession, ChunkingConfig, DocumentChunk, DocumentRecord
 from app.services.storage import LocalStateStore
 from app.ui.main_window import MainWindow
 from app.ui.chat_page import ChatPage
@@ -47,6 +47,52 @@ def test_main_window_contains_workspace_and_creates_session(tmp_path):
     assert window.current_session.id == first_session_id
     assert window.current_session.id != second_session_id
     assert window.chat_page.title.text() == "新对话"
+    window.close()
+    application.processEvents()
+
+
+def test_main_window_removes_chunk_without_deleting_source_document(tmp_path, monkeypatch):
+    application = QApplication.instance() or QApplication([])
+    config = AppConfig.from_root(tmp_path)
+    state = LocalStateStore(config.state_dir)
+    knowledge_base = state.create_knowledge_base("人工智能学习")
+    source = tmp_path / "讲义.md"
+    source.write_text("原始文档仍然保留", encoding="utf-8")
+    record = DocumentRecord.new(
+        knowledge_base.id,
+        source.name,
+        "hash",
+        ChunkingConfig(),
+        source_path=str(source),
+    )
+    record.status = "ready"
+    record.chunk_count = 2
+    state.save_document(record)
+    window = MainWindow(config, state, knowledge_base.id)
+
+    class FakeStore:
+        def __init__(self):
+            self.deleted_chunk_ids = []
+
+        def delete_chunk(self, chunk_id):
+            self.deleted_chunk_ids.append(chunk_id)
+            return chunk_id == "chunk-1"
+
+        def get_document_chunks(self, _document_id):
+            return [DocumentChunk("chunk-2", "第二段")]
+
+    store = FakeStore()
+    monkeypatch.setattr(window, "_store_factory", lambda _kb_id: store)
+    monkeypatch.setattr(
+        "app.ui.main_window.QMessageBox.question",
+        lambda *args, **kwargs: QMessageBox.StandardButton.Yes,
+    )
+
+    window.delete_chunk_from_knowledge_base(record.id, "chunk-1")
+
+    assert store.deleted_chunk_ids == ["chunk-1"]
+    assert state.get_document(record.id).chunk_count == 1
+    assert source.exists()
     window.close()
     application.processEvents()
 
@@ -187,6 +233,22 @@ def test_chat_page_renders_user_and_assistant_messages_as_widgets():
 
     assert page.messages.itemWidget(page.messages.item(0)) is not None
     assert page.messages.itemWidget(page.messages.item(1)) is not None
+    page.close()
+    application.processEvents()
+
+
+def test_chat_page_renders_assistant_replies_as_markdown_but_keeps_user_text_plain():
+    application = QApplication.instance() or QApplication([])
+    page = ChatPage()
+    page.append_user("**原样输入**")
+    page.start_assistant()
+    page.append_token("## 标题\n\n这是 **加粗** 内容。\n\n- 第一项\n- 第二项\n\n`print('hi')`")
+
+    user_bubble = page.messages.itemWidget(page.messages.item(0)).findChild(type(page._assistant_bubble))
+    assistant_bubble = page.messages.itemWidget(page.messages.item(1)).findChild(type(page._assistant_bubble))
+    assert user_bubble.content_label.text() == "**原样输入**"
+    assert "font-weight" in assistant_bubble.content_label.text()
+    assert "第一项" in assistant_bubble.content_label.text()
     page.close()
     application.processEvents()
 
