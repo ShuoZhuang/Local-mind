@@ -45,6 +45,7 @@ class WorkspaceShell(QWidget):
         self.context_toggle = QPushButton("收起")
         self.context_toggle.setObjectName("QuietButton")
         self.context_toggle.clicked.connect(lambda: self.set_context_visible(not self.context_is_visible))
+        self.context_toggle.hide()
         header.addWidget(self.context_toggle)
         context_layout.addLayout(header)
         context_layout.addWidget(context, 1)
@@ -64,17 +65,16 @@ class WorkspaceShell(QWidget):
         layout.setSpacing(0)
         layout.addWidget(self.splitter, 0, 0, 1, 2)
 
-        self.context_expand_button = QPushButton("展开")
-        self.context_expand_button.setObjectName("QuietButton")
-        self.context_expand_button.setToolTip("展开右侧栏")
-        self.context_expand_button.setFixedWidth(58)
-        self.context_expand_button.clicked.connect(lambda: self.set_context_visible(True))
-        self.context_expand_button.hide()
+        self.context_expand_button = QPushButton("›")
+        self.context_expand_button.setObjectName("ContextEdgeButton")
+        self.context_expand_button.setToolTip("收起回答依据")
+        self.context_expand_button.setFixedSize(30, 74)
+        self.context_expand_button.clicked.connect(self._toggle_context)
         layout.addWidget(
             self.context_expand_button,
             0,
             1,
-            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight,
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
         )
 
     def set_context_page(self, page: QWidget) -> None:
@@ -92,12 +92,13 @@ class WorkspaceShell(QWidget):
             return
         self.context_is_visible = visible
         self.context_toggle.setText("收起" if visible else "展开")
+        self.context_expand_button.setText("›" if visible else "‹")
+        self.context_expand_button.setToolTip("收起回答依据" if visible else "展开回答依据")
         if visible:
             self._width_animation.stop()
             self.context_container.show()
             self.context_container.setMinimumWidth(320)
             self.context_container.setMaximumWidth(self._expanded_context_width)
-            self.context_expand_button.hide()
             self.layout().activate()
             self._apply_splitter_sizes()
         else:
@@ -114,6 +115,9 @@ class WorkspaceShell(QWidget):
             self.layout().activate()
             self.splitter.setSizes([260, max(1, self.splitter.width() - 260), 0])
         self.context_visibility_changed.emit(visible)
+
+    def _toggle_context(self) -> None:
+        self.set_context_visible(not self.context_is_visible)
 
     def _apply_splitter_sizes(self) -> None:
         available = self.splitter.width()

@@ -21,13 +21,14 @@ def test_workspace_switches_context_visibility():
     shell = WorkspaceShell(QWidget(), QWidget(), QWidget())
 
     assert shell.context_is_visible is True
+    assert shell.context_expand_button.text() == "›"
     shell.set_context_visible(False, animate=False)
     assert shell.context_is_visible is False
     assert shell.context_container.isHidden()
-    assert shell.context_expand_button.text() == "›"
+    assert shell.context_expand_button.text() == "‹"
     shell.context_expand_button.click()
     assert shell.context_is_visible is True
-    assert shell.context_expand_button.text() == "‹"
+    assert shell.context_expand_button.text() == "›"
     shell.close()
     application.processEvents()
 
@@ -57,6 +58,17 @@ def test_workspace_auto_collapses_context_on_narrow_width():
     shell.resize(1300, 700)
     application.processEvents()
     assert shell.context_is_visible is True
+    shell.close()
+    application.processEvents()
+
+
+def test_workspace_edge_arrow_points_to_the_next_context_state():
+    application = QApplication.instance() or QApplication([])
+    shell = WorkspaceShell(QWidget(), QWidget(), QWidget())
+
+    assert shell.context_expand_button.text() == "›"
+    shell.set_context_visible(False, animate=False)
+    assert shell.context_expand_button.text() == "‹"
     shell.close()
     application.processEvents()
 
