@@ -4,7 +4,15 @@ import json
 from pathlib import Path
 from typing import Any
 
-from app.models import ChunkingConfig, ChatMessage, ChatSession, DocumentRecord, KnowledgeBase, now_iso
+from app.models import (
+    ChunkingConfig,
+    ChatMessage,
+    ChatSession,
+    DocumentRecord,
+    KnowledgeBase,
+    MCPServerDefinition,
+    now_iso,
+)
 
 
 class LocalStateStore:
@@ -16,6 +24,7 @@ class LocalStateStore:
         self.documents_path = self.root / "documents.json"
         self.chunking_default_path = self.root / "chunking_default.json"
         self.settings_path = self.root / "settings.json"
+        self.mcp_servers_path = self.root / "mcp_servers.json"
 
     def load_preheat_models(self) -> bool:
         return bool(self._read_json(self.settings_path, {}).get("preheat_models", False))
@@ -24,6 +33,29 @@ class LocalStateStore:
         settings = self._read_json(self.settings_path, {})
         settings["preheat_models"] = bool(enabled)
         self._write_json(self.settings_path, settings)
+
+    def list_mcp_servers(self) -> list[MCPServerDefinition]:
+        servers: list[MCPServerDefinition] = []
+        for item in self._read_json(self.mcp_servers_path, []):
+            if not isinstance(item, dict):
+                continue
+            try:
+                servers.append(MCPServerDefinition.from_dict(item))
+            except (KeyError, TypeError, ValueError):
+                continue
+        return servers
+
+    def save_mcp_server(self, server: MCPServerDefinition) -> None:
+        if not server.command.strip():
+            raise ValueError("MCP 服务命令不能为空")
+        server.updated_at = now_iso()
+        servers = {item.id: item for item in self.list_mcp_servers()}
+        servers[server.id] = server
+        self._write_json(self.mcp_servers_path, [item.to_dict() for item in servers.values()])
+
+    def delete_mcp_server(self, server_id: str) -> None:
+        servers = [item for item in self.list_mcp_servers() if item.id != server_id]
+        self._write_json(self.mcp_servers_path, [item.to_dict() for item in servers])
 
     def create_knowledge_base(self, name: str, description: str = "") -> KnowledgeBase:
         item = KnowledgeBase.new(name, description)

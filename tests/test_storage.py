@@ -1,4 +1,10 @@
-from app.models import ChatMessage, ChatSession, ChunkingConfig, DocumentRecord
+from app.models import (
+    ChatMessage,
+    ChatSession,
+    ChunkingConfig,
+    DocumentRecord,
+    MCPServerDefinition,
+)
 from app.services.storage import LocalStateStore
 
 
@@ -119,3 +125,30 @@ def test_recover_stale_processing_documents_marks_them_failed(tmp_path):
     updated = store.get_document(record.id)
     assert updated.status == "failed"
     assert "上一次处理未完成" in (updated.error or "")
+
+
+def test_mcp_server_definitions_round_trip_through_state(tmp_path):
+    store = LocalStateStore(tmp_path)
+    server = MCPServerDefinition.new(
+        "本地测试服务",
+        "python",
+        ("-m", "tests.mcp_test_server"),
+        cwd="C:/tools",
+        env={"DEMO_KEY": "demo"},
+    )
+
+    store.save_mcp_server(server)
+
+    assert LocalStateStore(tmp_path).list_mcp_servers() == [server]
+
+
+def test_deleting_mcp_server_removes_only_requested_configuration(tmp_path):
+    store = LocalStateStore(tmp_path)
+    kept = MCPServerDefinition.new("保留", "python")
+    removed = MCPServerDefinition.new("删除", "node")
+    store.save_mcp_server(kept)
+    store.save_mcp_server(removed)
+
+    store.delete_mcp_server(removed.id)
+
+    assert [item.id for item in store.list_mcp_servers()] == [kept.id]

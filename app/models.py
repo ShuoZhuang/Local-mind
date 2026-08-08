@@ -134,6 +134,69 @@ class ModelDefinition:
 
 
 @dataclass
+class MCPServerDefinition:
+    """A user-approved local stdio MCP server configuration."""
+
+    id: str
+    name: str
+    command: str
+    args: list[str] = field(default_factory=list)
+    cwd: str | None = None
+    env: dict[str, str] = field(default_factory=dict)
+    enabled: bool = True
+    created_at: str = ""
+    updated_at: str = ""
+
+    @classmethod
+    def new(
+        cls,
+        name: str,
+        command: str,
+        args: tuple[str, ...] | list[str] = (),
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        enabled: bool = True,
+    ) -> "MCPServerDefinition":
+        timestamp = now_iso()
+        return cls(
+            id=f"mcp-{uuid4().hex[:12]}",
+            name=str(name).strip() or "未命名 MCP 服务",
+            command=str(command).strip(),
+            args=[str(value) for value in args],
+            cwd=str(cwd).strip() if cwd else None,
+            env={str(key): str(value) for key, value in (env or {}).items()},
+            enabled=bool(enabled),
+            created_at=timestamp,
+            updated_at=timestamp,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "MCPServerDefinition":
+        raw_args = data.get("args", [])
+        raw_env = data.get("env", {})
+        if not isinstance(raw_args, list):
+            raw_args = []
+        if not isinstance(raw_env, dict):
+            raw_env = {}
+        created_at = str(data.get("created_at", ""))
+        updated_at = str(data.get("updated_at", created_at))
+        return cls(
+            id=str(data["id"]),
+            name=str(data.get("name", "未命名 MCP 服务")),
+            command=str(data.get("command", "")),
+            args=[str(value) for value in raw_args],
+            cwd=str(data["cwd"]).strip() if data.get("cwd") else None,
+            env={str(key): str(value) for key, value in raw_env.items()},
+            enabled=bool(data.get("enabled", True)),
+            created_at=created_at,
+            updated_at=updated_at,
+        )
+
+
+@dataclass
 class SearchHit:
     id: str
     text: str
