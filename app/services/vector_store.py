@@ -41,6 +41,14 @@ class KnowledgeBaseVectorStore:
         if ids:
             self.collection.delete(ids=ids)
 
+    def delete_chunk(self, chunk_id: str) -> bool:
+        """从检索向量库中移除一个分块，不触碰原始文档。"""
+        found = self.collection.get(ids=[chunk_id])
+        if not found.get("ids"):
+            return False
+        self.collection.delete(ids=[chunk_id])
+        return True
+
     def get_document_chunks(self, document_id: str) -> list[DocumentChunk]:
         result = self.collection.get(
             where={"document_id": document_id},
