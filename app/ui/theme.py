@@ -21,6 +21,9 @@ QPushButton#PrimaryButton { background: #87dfc3; color: #10221e; border: 1px sol
 QPushButton#PrimaryButton:hover { background: #9ce8cf; border-color: #9ce8cf; }
 QPushButton#QuietButton { min-height: 26px; padding: 3px 9px; border-color: transparent; background: transparent; color: #91a0b5; }
 QPushButton#QuietButton:hover { color: #eaf1f7; background: #1c2531; }
+QPushButton#SidebarNav { text-align: left; min-height: 34px; border-color: transparent; background: transparent; color: #aebccd; }
+QPushButton#SidebarNav:hover { border-color: #334c5d; background: #182633; color: #eaf1f7; }
+QPushButton#SidebarNav[active="true"] { border-color: #376a69; background: #193b3b; color: #dffff5; }
 QComboBox, QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox {
     border: 1px solid #273447;
     border-radius: 10px;
@@ -45,6 +48,27 @@ QLabel#Title { color: #f1f6fb; font-size: 20px; font-weight: 700; }
 QFrame#Sidebar { background: #111720; border-right: 1px solid #273447; }
 QFrame#ContextRail { background: #141b25; border-left: 1px solid #273447; }
 QFrame#Card { border: 1px solid #273447; border-radius: 12px; background: #161d27; }
+QFrame#ToolCenterPage { background: #101822; }
+QFrame#ToolCard { border: 1px solid #2b3d50; border-radius: 14px; background: #172333; }
+QFrame#ToolCard:hover { border-color: #537b8e; background: #1a2b3a; }
+QFrame#ToolCard[selected="true"] { border: 2px solid #73d9c1; background: #183542; }
+QLabel#ToolIcon { color: #9fd2e4; border: 1px solid #3b6a80; border-radius: 22px; background: #172c3e; font-size: 22px; }
+QLabel#ToolCardTitle { color: #eff9ff; font-size: 16px; font-weight: 700; }
+QLabel#ToolCardDescription { color: #a9bacb; line-height: 1.35; }
+QLabel#ToolEnabledStatus { color: #67e39a; font-weight: 700; }
+QLabel#ToolDisabledStatus { color: #8898a9; }
+QPushButton#ToolFilterButton { min-height: 28px; padding: 4px 13px; border-radius: 14px; color: #9cacbd; background: #172333; }
+QPushButton#ToolFilterButton:checked { color: #eafff8; border-color: #73d9c1; background: #1b4b49; }
+QFrame#ToolDetailsPanel { background: #121d2a; border: 1px solid #2b3d50; border-radius: 14px; }
+QLabel#ToolDetailsTitle { color: #f1f7fb; font-size: 21px; font-weight: 700; }
+QLabel#ToolDetailsStatus { color: #67e39a; font-weight: 700; }
+QLabel#ToolDetailsDescription { color: #b6c4d2; line-height: 1.45; }
+QLabel#ToolCapabilities { color: #c9e7df; padding: 8px 10px; border: 1px solid #2d5b5c; border-radius: 9px; background: #152e35; }
+QLabel#ToolExample { color: #c9f4e6; padding: 10px; border: 1px solid #2b4d5f; border-radius: 9px; background: #142331; font-family: 'Cascadia Mono', 'Consolas'; }
+QLabel#ToolSectionTitle { color: #eff7fb; font-size: 14px; font-weight: 700; }
+QLabel#ToolRecentCalls { color: #aebdca; padding: 10px; border: 1px solid #273a4c; border-radius: 9px; background: #14202d; }
+QLabel#ContextTitle { color: #f1f6fb; font-size: 19px; font-weight: 700; }
+QScrollBar:horizontal { height: 0; }
 QFrame#UserBubble { border: 1px solid #5aa88e; border-radius: 12px; background: #21483d; margin: 0; }
 QFrame#AssistantBubble { border: 1px solid #4b6684; border-radius: 12px; background: #1d2938; margin: 0; }
 QFrame#UserBubble:hover { border-color: #87dfc3; background: #285447; }

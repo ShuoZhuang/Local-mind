@@ -25,6 +25,7 @@ from app.ui.context_panels import CitationPanel, DocumentDetailPanel, ImportProg
 from app.ui.knowledge_page import KnowledgePage
 from app.ui.sidebar import Sidebar
 from app.ui.theme import APP_STYLE
+from app.ui.tool_center_page import DEFAULT_TOOL_DEFINITIONS, ToolCenterPage, ToolDetailsPanel
 from app.ui.workspace import WorkspaceShell
 from app.ui.workers import ImportWorker, StreamWorker, WarmupWorker
 
@@ -64,20 +65,25 @@ class MainWindow(QMainWindow):
         self.sidebar = Sidebar(self.state, self.model_registry)
         self.chat_page = ChatPage()
         self.knowledge_page = KnowledgePage()
+        self.tool_center_page = ToolCenterPage()
+        self.tool_center_page.set_tools(DEFAULT_TOOL_DEFINITIONS)
         self.stack = QStackedWidget()
         self.stack.addWidget(self.chat_page)
         self.stack.addWidget(self.knowledge_page)
+        self.stack.addWidget(self.tool_center_page)
         self.context_stack = QStackedWidget()
         self.knowledge_overview_panel = KnowledgeOverviewPanel()
         self.knowledge_import_panel = KnowledgeImportPanel()
         self.import_progress_panel = ImportProgressPanel()
         self.document_detail_panel = DocumentDetailPanel()
         self.citation_panel = CitationPanel()
+        self.tool_details_panel = ToolDetailsPanel()
         self.context_stack.addWidget(self.knowledge_overview_panel)
         self.context_stack.addWidget(self.knowledge_import_panel)
         self.context_stack.addWidget(self.import_progress_panel)
         self.context_stack.addWidget(self.document_detail_panel)
         self.context_stack.addWidget(self.citation_panel)
+        self.context_stack.addWidget(self.tool_details_panel)
         self.workspace = WorkspaceShell(self.sidebar, self.stack, self.context_stack)
         container = QWidget()
         layout = QHBoxLayout(container)
@@ -96,6 +102,8 @@ class MainWindow(QMainWindow):
         self.sidebar.delete_session_requested.connect(self.delete_session)
         self.sidebar.knowledge_page_requested.connect(self.show_knowledge_page)
         self.sidebar.chat_page_requested.connect(self.show_chat_page)
+        self.sidebar.tool_page_requested.connect(self.show_tool_page)
+        self.tool_center_page.tool_selected.connect(self._show_tool_details)
         self.chat_page.send_requested.connect(self.receive_query)
         self.chat_page.stop_requested.connect(self.stop_generation)
         self.chat_page.knowledge_bases_changed.connect(self._set_chat_knowledge_bases)
@@ -145,6 +153,17 @@ class MainWindow(QMainWindow):
         self.sidebar.activate_chat_context(session_id)
         self.context_stack.setCurrentWidget(self.citation_panel)
         self.stack.setCurrentWidget(self.chat_page)
+
+    def show_tool_page(self):
+        self.sidebar.activate_tool_context()
+        self.context_stack.setCurrentWidget(self.tool_details_panel)
+        self.stack.setCurrentWidget(self.tool_center_page)
+        selected_id = self.tool_center_page.selected_tool_id()
+        if selected_id:
+            self._show_tool_details(selected_id)
+
+    def _show_tool_details(self, tool_id: str) -> None:
+        self.tool_details_panel.set_tool(self.tool_center_page.tool(tool_id))
 
     def select_model(self, model_id: str):
         self.current_model_id = model_id

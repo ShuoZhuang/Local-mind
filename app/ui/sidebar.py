@@ -20,6 +20,7 @@ class Sidebar(QFrame):
     new_session_requested = Signal()
     knowledge_page_requested = Signal()
     chat_page_requested = Signal()
+    tool_page_requested = Signal()
     new_knowledge_base_requested = Signal()
     session_selected = Signal(str)
     rename_knowledge_base_requested = Signal(str)
@@ -43,6 +44,9 @@ class Sidebar(QFrame):
         self.new_knowledge_base_button = QPushButton("＋ 新建知识库")
         self.knowledge_button = QPushButton("▣ 知识库管理")
         self.chat_button = QPushButton("◌ 对话")
+        self.tool_button = QPushButton("⚒ 工具")
+        for button in (self.chat_button, self.knowledge_button, self.tool_button):
+            button.setObjectName("SidebarNav")
         self._build()
         self.refresh()
 
@@ -59,6 +63,7 @@ class Sidebar(QFrame):
         layout.addSpacing(10)
         layout.addWidget(self.chat_button)
         layout.addWidget(self.knowledge_button)
+        layout.addWidget(self.tool_button)
         layout.addWidget(self.new_session_button)
         layout.addWidget(self.new_knowledge_base_button)
         layout.addWidget(QLabel("我的知识库"))
@@ -79,6 +84,7 @@ class Sidebar(QFrame):
         self.new_session_button.clicked.connect(self.new_session_requested)
         self.knowledge_button.clicked.connect(self.knowledge_page_requested)
         self.chat_button.clicked.connect(self.chat_page_requested)
+        self.tool_button.clicked.connect(self.tool_page_requested)
         self.new_knowledge_base_button.clicked.connect(self.new_knowledge_base_requested)
 
     def refresh(self):
@@ -106,6 +112,7 @@ class Sidebar(QFrame):
 
     def activate_chat_context(self, session_id: str | None = None) -> None:
         self.active_context_id = session_id
+        self._set_active_nav(self.chat_button)
         self.knowledge_base_list.blockSignals(True)
         self.knowledge_base_list.setCurrentRow(-1)
         self.knowledge_base_list.blockSignals(False)
@@ -118,6 +125,7 @@ class Sidebar(QFrame):
 
     def activate_knowledge_context(self, knowledge_base_id: str) -> None:
         self.active_context_id = knowledge_base_id
+        self._set_active_nav(self.knowledge_button)
         self.session_list.blockSignals(True)
         self.session_list.setCurrentRow(-1)
         self.session_list.blockSignals(False)
@@ -127,6 +135,23 @@ class Sidebar(QFrame):
                 self.knowledge_base_list.setCurrentRow(row)
                 break
         self.knowledge_base_list.blockSignals(False)
+
+    def activate_tool_context(self) -> None:
+        self.active_context_id = None
+        self._set_active_nav(self.tool_button)
+        self.knowledge_base_list.blockSignals(True)
+        self.knowledge_base_list.setCurrentRow(-1)
+        self.knowledge_base_list.blockSignals(False)
+        self.session_list.blockSignals(True)
+        self.session_list.setCurrentRow(-1)
+        self.session_list.blockSignals(False)
+
+    def _set_active_nav(self, active_button: QPushButton) -> None:
+        for button in (self.chat_button, self.knowledge_button, self.tool_button):
+            button.setProperty("active", button is active_button)
+            button.style().unpolish(button)
+            button.style().polish(button)
+            button.update()
 
     def _emit_model(self, index: int):
         model_id = self.model_combo.itemData(index)

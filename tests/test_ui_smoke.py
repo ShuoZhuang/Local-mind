@@ -51,6 +51,29 @@ def test_main_window_contains_workspace_and_creates_session(tmp_path):
     application.processEvents()
 
 
+def test_tools_button_opens_tool_center_and_keeps_library_lists(tmp_path):
+    application = QApplication.instance() or QApplication([])
+    config = AppConfig.from_root(tmp_path)
+    state = LocalStateStore(config.state_dir)
+    knowledge_base = state.create_knowledge_base("人工智能学习")
+    window = MainWindow(config, state, knowledge_base.id)
+
+    assert window.sidebar.tool_button is not None
+    assert window.sidebar.knowledge_base_list is not None
+    assert window.sidebar.session_list is not None
+    window.sidebar.tool_button.click()
+
+    assert window.stack.currentWidget() is window.tool_center_page
+    assert window.context_stack.currentWidget() is window.tool_details_panel
+    assert window.sidebar.tool_button.property("active") is True
+    assert window.sidebar.chat_button.property("active") is False
+    assert window.sidebar.knowledge_button.property("active") is False
+    assert window.sidebar.knowledge_base_list.currentRow() == -1
+    assert window.sidebar.session_list.currentRow() == -1
+    window.close()
+    application.processEvents()
+
+
 def test_build_window_uses_project_local_state(tmp_path):
     application = QApplication.instance() or QApplication([])
 
