@@ -196,6 +196,84 @@ class MCPServerDefinition:
         )
 
 
+@dataclass(frozen=True)
+class MCPToolDisplayMetadata:
+    """Optional user-facing text for one discovered MCP tool."""
+
+    server_id: str
+    tool_name: str
+    display_name: str = ""
+    description: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "MCPToolDisplayMetadata":
+        return cls(
+            server_id=str(data["server_id"]),
+            tool_name=str(data["tool_name"]),
+            display_name=str(data.get("display_name", "")).strip(),
+            description=str(data.get("description", "")).strip(),
+        )
+
+
+@dataclass(frozen=True)
+class ToolContract:
+    """Safety and routing contract attached to every model-callable tool."""
+
+    purpose: str = ""
+    use_when: tuple[str, ...] = field(default_factory=tuple)
+    avoid_when: tuple[str, ...] = field(default_factory=tuple)
+    intent_keywords: tuple[str, ...] = field(default_factory=tuple)
+    intent_exclusions: tuple[str, ...] = field(default_factory=tuple)
+    parameter_rules: tuple[str, ...] = field(default_factory=tuple)
+    examples: tuple[str, ...] = field(default_factory=tuple)
+    recovery_hint: str = ""
+    retry_on_error: bool = False
+    configured: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ToolContract":
+        values = dict(data or {})
+        return cls(
+            purpose=str(values.get("purpose", "")),
+            use_when=tuple(str(value) for value in values.get("use_when", []) or []),
+            avoid_when=tuple(str(value) for value in values.get("avoid_when", []) or []),
+            intent_keywords=tuple(str(value) for value in values.get("intent_keywords", []) or []),
+            intent_exclusions=tuple(str(value) for value in values.get("intent_exclusions", []) or []),
+            parameter_rules=tuple(str(value) for value in values.get("parameter_rules", []) or []),
+            examples=tuple(str(value) for value in values.get("examples", []) or []),
+            recovery_hint=str(values.get("recovery_hint", "")),
+            retry_on_error=bool(values.get("retry_on_error", False)),
+            configured=bool(values.get("configured", True)),
+        )
+
+
+@dataclass(frozen=True)
+class ToolDefinition:
+    """A card-ready description of a real tool or a local system capability."""
+
+    id: str
+    name: str
+    category: str
+    description: str
+    capabilities: tuple[str, ...] = field(default_factory=tuple)
+    enabled: bool = False
+    icon_text: str = "◇"
+    recent_calls: tuple[str, ...] = field(default_factory=tuple)
+    kind: str = "tool"
+    source: str | None = None
+    input_schema: dict[str, Any] = field(default_factory=dict)
+    raw_name: str | None = None
+    raw_description: str | None = None
+    last_error: str | None = None
+    contract: ToolContract = field(default_factory=ToolContract)
+
+
 @dataclass
 class SearchHit:
     id: str

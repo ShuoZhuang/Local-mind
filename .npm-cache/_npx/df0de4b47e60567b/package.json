@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "@dangahagan/weather-mcp": "^1.13.0"
+  },
+  "_npx": {
+    "packages": [
+      "@dangahagan/weather-mcp@latest"
+    ]
+  }
+}

@@ -1,8 +1,9 @@
 import torch
 
-from app.models import ModelDefinition, SearchHit
+from app.models import ModelDefinition, SearchHit, ToolDefinition
 from app.services.chat import ChatService, ChatEvent
 from app.services.llm import LocalLLM
+from app.services.mcp_client import MCPCallResult
 
 
 class FakeRetrieval:
@@ -40,6 +41,55 @@ class FakeCalculator:
             "steps": [],
             "error": None,
         }
+
+
+class FakeToolRegistry:
+    def __init__(self, result=None):
+        self.calls = []
+        self.tool = ToolDefinition(
+            id="mcp:weather:weather",
+            name="天气查询",
+            category="MCP",
+            description="查询城市天气",
+            capabilities=("MCP",),
+            enabled=True,
+            kind="mcp",
+            source="天气服务",
+            input_schema={
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+                "required": ["city"],
+                "additionalProperties": False,
+            },
+        )
+        self.result = result or MCPCallResult(
+            True,
+            ["28 度"],
+            {"temperature": 28},
+        )
+
+    def list_tools(self):
+        return [self.tool]
+
+    def get(self, tool_id):
+        return self.tool if tool_id == self.tool.id else None
+
+    def call(self, tool_id, arguments):
+        self.calls.append((tool_id, arguments))
+        return self.result
+
+
+class PlanningLLM(FakeLLM):
+    def __init__(self, planning_text):
+        super().__init__()
+        self.planning_text = planning_text
+
+    def generate_stream(self, messages, max_new_tokens=512):
+        self.prompts.append(messages)
+        if len(self.prompts) == 1:
+            yield self.planning_text
+        else:
+            yield "天气是 28 度。"
 
 
 def test_chat_service_includes_sources_and_question_in_prompt():
@@ -105,6 +155,86 @@ def test_chat_service_uses_calculator_before_retrieval():
     assert events[1].payload["name"] == "calculator"
     assert events[2].payload == []
     assert "121932631112635269" in llm.prompts[0][-1]["content"]
+
+
+def test_chat_service_calls_enabled_mcp_tool_and_uses_result_in_final_prompt():
+    registry = FakeToolRegistry()
+    llm = PlanningLLM(
+        '{"tool_call":{"tool_id":"mcp:weather:weather","arguments":{"city":"上海"}}}'
+    )
+    service = ChatService(
+        FakeRetrieval([]),
+        lambda model_id: llm,
+        tool_registry=registry,
+    )
+
+    events = list(service.answer("上海天气如何", "kb-ai", "qwen-1.5b", []))
+
+    assert registry.calls == [("mcp:weather:weather", {"city": "上海"})]
+    assert [event.kind for event in events] == [
+        "status",
+        "citation",
+        "status",
+        "status",
+        "tool",
+        "status",
+        "token",
+        "done",
+    ]
+    assert events[4].payload["tool_id"] == "mcp:weather:weather"
+    assert events[4].payload["result"]["structured_content"] == {"temperature": 28}
+    assert "temperature" in llm.prompts[1][-1]["content"]
+
+
+def test_chat_service_skips_mcp_when_model_returns_null_call():
+    registry = FakeToolRegistry()
+    llm = PlanningLLM('{"tool_call":null}')
+    service = ChatService(
+        FakeRetrieval([]),
+        lambda model_id: llm,
+        tool_registry=registry,
+    )
+
+    events = list(service.answer("你好", "kb-ai", "qwen-1.5b", []))
+
+    assert registry.calls == []
+    assert not any(event.kind == "tool" for event in events)
+    assert len(llm.prompts) == 2
+
+
+def test_chat_service_rejects_unknown_mcp_tool_without_calling_registry():
+    registry = FakeToolRegistry()
+    llm = PlanningLLM(
+        '{"tool_call":{"tool_id":"mcp:unknown:run","arguments":{}}}'
+    )
+    service = ChatService(
+        FakeRetrieval([]),
+        lambda model_id: llm,
+        tool_registry=registry,
+    )
+
+    events = list(service.answer("运行未知工具", "kb-ai", "qwen-1.5b", []))
+
+    assert registry.calls == []
+    assert not any(event.kind == "tool" for event in events)
+    assert len(llm.prompts) == 2
+
+
+def test_chat_service_preserves_calculator_shortcut_with_registry():
+    registry = FakeToolRegistry()
+    llm = FakeLLM()
+    calculator = FakeCalculator()
+    service = ChatService(
+        FakeRetrieval([]),
+        lambda model_id: llm,
+        calculator,
+        registry,
+    )
+
+    list(service.answer("计算 123 + 456", "kb-ai", "qwen-1.5b", []))
+
+    assert registry.calls == []
+    assert len(llm.prompts) == 1
 
 
 def test_local_llm_selects_available_cuda_device(tmp_path):

@@ -1,11 +1,21 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from collections.abc import Sequence
 from typing import Any, Iterator, Literal
 
 from app.models import ChatMessage, SearchHit
+from app.services.tool_calling import (
+    ToolCallRequest,
+    build_planning_messages,
+    build_tool_repair_messages,
+    build_tool_result_messages,
+    normalize_tool_call,
+    parse_tool_call,
+)
+from app.services.tool_contracts import select_candidate_tools, validate_tool_arguments
 from app.services.tool_router import CalculatorRouter
 from tools.calculator.tool import calculator_tool
 
@@ -17,10 +27,11 @@ class ChatEvent:
 
 
 class ChatService:
-    def __init__(self, retrieval, llm_factory, calculator=None):
+    def __init__(self, retrieval, llm_factory, calculator=None, tool_registry=None):
         self.retrieval = retrieval
         self.llm_factory = llm_factory
         self.calculator = calculator or calculator_tool
+        self.tool_registry = tool_registry
 
     def answer(
         self,
@@ -74,12 +85,201 @@ class ChatService:
         citations = [self._citation(hit) for hit in hits]
         yield ChatEvent("citation", citations)
         context = self._context(hits)
-        messages = self._messages(history, query, context)
+        mcp_tools = self._enabled_mcp_tools()
+        candidate_tools = select_candidate_tools(query, mcp_tools)
+        if self._needs_weather_location_clarification(query, candidate_tools):
+            # Do not make the model invent a location or answer from unrelated
+            # knowledge-base chunks when the weather request has no city.
+            yield ChatEvent("citation", [])
+            yield ChatEvent("status", "需要先确认查询地点")
+            yield ChatEvent("token", "想查询哪个城市的天气？例如：`上海今天天气怎么样？`")
+            yield ChatEvent("done", {"citations": []})
+            return
         llm = self.llm_factory(model_id)
-        yield ChatEvent("status", "正在加载本地模型并生成回答…")
+        tool_record = None
+        if candidate_tools:
+            request = self._weather_request(query, candidate_tools)
+            if request is None:
+                yield ChatEvent("status", "正在判断是否需要本地 MCP 工具…")
+                planning_messages = build_planning_messages(history, query, context, candidate_tools)
+                planning_text = "".join(
+                    llm.generate_stream(planning_messages, max_new_tokens=256)
+                )
+                request = normalize_tool_call(
+                    query,
+                    parse_tool_call(planning_text),
+                    candidate_tools,
+                )
+            tool = self._validated_mcp_tool(request, candidate_tools)
+            validation_errors = (
+                validate_tool_arguments(tool, request.arguments)
+                if request is not None and tool is not None
+                else ()
+            )
+            if validation_errors and request is not None and tool is not None:
+                yield ChatEvent("status", "正在修复工具参数")
+                repair_messages = build_tool_repair_messages(
+                    history,
+                    query,
+                    context,
+                    candidate_tools,
+                    request,
+                    validation_errors,
+                )
+                repair_text = "".join(
+                    llm.generate_stream(repair_messages, max_new_tokens=256)
+                )
+                request = normalize_tool_call(
+                    query,
+                    parse_tool_call(repair_text),
+                    candidate_tools,
+                )
+                tool = self._validated_mcp_tool(request, candidate_tools)
+                validation_errors = (
+                    validate_tool_arguments(tool, request.arguments)
+                    if request is not None and tool is not None
+                    else ()
+                )
+            if request is not None and tool is not None and not validation_errors:
+                yield ChatEvent("status", f"正在调用 {tool.name} …")
+                result = self._call_mcp_tool(request)
+                tool_record = {
+                    "tool_id": request.tool_id,
+                    "name": tool.name,
+                    "source": tool.source,
+                    "arguments": request.arguments,
+                    "result": result,
+                }
+                yield ChatEvent("tool", tool_record)
+                yield ChatEvent("status", "工具调用完成，正在生成最终回答…")
+                messages = build_tool_result_messages(
+                    history,
+                    query,
+                    context,
+                    request,
+                    result,
+                )
+            else:
+                messages = self._messages(history, query, context)
+                yield ChatEvent("status", "正在加载本地模型并生成回答…")
+        else:
+            messages = self._messages(history, query, context)
+            yield ChatEvent("status", "正在加载本地模型并生成回答…")
         for token in llm.generate_stream(messages):
             yield ChatEvent("token", token)
-        yield ChatEvent("done", {"citations": citations})
+        done_payload = {"citations": citations}
+        if tool_record is not None:
+            done_payload["tool_calls"] = [tool_record]
+        yield ChatEvent("done", done_payload)
+
+    def _enabled_mcp_tools(self):
+        if self.tool_registry is None:
+            return []
+        return [
+            tool
+            for tool in self.tool_registry.list_tools()
+            if tool.kind == "mcp" and tool.enabled
+        ]
+
+    @classmethod
+    def _needs_weather_location_clarification(cls, query: str, candidates) -> bool:
+        if (
+            not candidates
+            or not cls._is_weather_query(query)
+            or not any(cls._is_weather_tool(tool) for tool in candidates)
+        ):
+            return False
+        return not cls._location_from_query(query)
+
+    @classmethod
+    def _weather_request(cls, query: str, candidates) -> ToolCallRequest | None:
+        if not cls._is_weather_query(query):
+            return None
+        location = cls._location_from_query(query)
+        if not location:
+            return None
+        tool = next((item for item in candidates if cls._is_weather_tool(item)), None)
+        properties = dict((tool.input_schema or {}).get("properties", {})) if tool else {}
+        if tool is None or "city_name" not in properties:
+            return None
+        return ToolCallRequest(tool.id, {"city_name": location})
+
+    @staticmethod
+    def _is_weather_query(query: str) -> bool:
+        text = str(query).casefold()
+        return any(
+            marker in text
+            for marker in (
+                "\u5929\u6c14", "\u6c14\u6e29", "\u6e29\u5ea6", "\u9884\u62a5", "\u964d\u96e8", "\u9884\u8b66",
+                "weather", "forecast", "temperature", "rain", "snow", "alert",
+            )
+        )
+
+    @staticmethod
+    def _is_weather_tool(tool) -> bool:
+        identity = " ".join(
+            (
+                str(tool.id),
+                str(tool.raw_name or ""),
+                str(tool.raw_description or ""),
+                str(tool.description),
+            )
+        ).casefold()
+        return "weather" in identity or "\u5929\u6c14" in identity
+
+    @staticmethod
+    def _location_from_query(query: str) -> str | None:
+        text = str(query).casefold()
+        common_cities = (
+            "\u4e0a\u6d77", "\u5317\u4eac", "\u5e7f\u5dde", "\u6df1\u5733", "\u676d\u5dde", "\u5357\u4eac",
+            "\u5929\u6d25", "\u91cd\u5e86", "\u6b66\u6c49", "\u6210\u90fd", "\u897f\u5b89", "\u82cf\u5dde",
+            "\u957f\u6c99", "\u9752\u5c9b", "\u53a6\u95e8", "\u53f0\u5317", "\u9999\u6e2f", "\u6fb3\u95e8",
+        )
+        matched_city = next((city for city in common_cities if city in text), None)
+        if matched_city:
+            return matched_city
+        matched_region = re.search(r"([\u4e00-\u9fff]{2,}(?:\u5e02|\u7701|\u533a|\u53bf|\u5dde|\u56fd))", text)
+        if matched_region:
+            return matched_region.group(1)
+        matched_english = re.search(r"\b(?:in|at)\s+([a-z][a-z .'-]{1,60})\b", text)
+        return matched_english.group(1).strip(" .") if matched_english else None
+
+    def _validated_mcp_tool(
+        self,
+        request: ToolCallRequest | None,
+        allowed_tools=None,
+    ):
+        if request is None or self.tool_registry is None:
+            return None
+        tool = self.tool_registry.get(request.tool_id)
+        if tool is None or tool.kind != "mcp" or not tool.enabled:
+            return None
+        if allowed_tools is not None and request.tool_id not in {
+            item.id for item in allowed_tools
+        }:
+            return None
+        return tool
+
+    def _call_mcp_tool(self, request: ToolCallRequest) -> dict[str, Any]:
+        try:
+            result = self.tool_registry.call(request.tool_id, request.arguments)
+        except Exception as error:
+            return {
+                "success": False,
+                "content": [],
+                "structured_content": None,
+                "is_error": True,
+                "error": str(error),
+            }
+        if isinstance(result, dict):
+            return dict(result)
+        return {
+            "success": bool(getattr(result, "success", False)),
+            "content": list(getattr(result, "content", []) or []),
+            "structured_content": getattr(result, "structured_content", None),
+            "is_error": bool(getattr(result, "is_error", False)),
+            "error": getattr(result, "error", None),
+        }
 
     @staticmethod
     def _citation(hit: SearchHit) -> dict[str, Any]:

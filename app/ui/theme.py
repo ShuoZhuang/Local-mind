@@ -51,6 +51,8 @@ QFrame#Sidebar { background: #111720; border-right: 1px solid #273447; }
 QFrame#ContextRail { background: #141b25; border-left: 1px solid #273447; }
 QFrame#Card { border: 1px solid #273447; border-radius: 12px; background: #161d27; }
 QFrame#ToolCenterPage { background: #101822; }
+QScrollArea#ToolCardsScrollArea, QWidget#ToolCardsContent { background: #101822; border: none; }
+QScrollArea#ToolDetailsScrollArea, QWidget#ToolDetailsContent { background: #121d2a; border: none; }
 QFrame#SkillsCenterPage { background: #101822; }
 QFrame#SkillsEmptyCard { border: 1px solid #2b3d50; border-radius: 16px; background: #172333; }
 QLabel#SkillsEmptyTitle { color: #eff9ff; font-size: 22px; font-weight: 700; }

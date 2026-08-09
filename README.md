@@ -9,6 +9,7 @@
 - 使用 `intfloat/multilingual-e5-small` 建立本地向量索引；
 - 使用本地 Qwen2.5-1.5B-Instruct 回答问题；
 - 对话流式输出，并显示检索到的引用文件；
+- 对已启用的本地 MCP Tool 进行一次模型规划、调用和结果总结；
 - 对话、原始文件、Embedding、Chroma 和模型缓存都留在本机；
 - 通过 `data/state/models.json` 注册后续本地模型。
 
@@ -109,3 +110,17 @@ calculator_tool.run({
 ```
 
 LocalMind 的对话服务已经接入这个 Tool：对明显的算式、单位换算和方程请求，会先由 `CalculatorRouter` 调用计算器，再把程序验证过的结果交给 Qwen 组织中文回答；普通问题仍然走知识库检索流程。后续如果更换为支持原生 Tool Calling 的模型，可以继续使用 `calculator_tool.schema()` 注册工具。
+
+## MCP 本地接入
+
+LocalMind 可以作为 **MCP Client** 连接你明确配置的本地 `stdio` MCP Server。打开“工具中心”后点击“管理 MCP Server”，填写例如：
+
+```text
+名称：本地演示 MCP 服务
+命令：python
+参数：["-m", "my_mcp_server"]
+```
+
+保存时会要求再次确认：该命令仅会在本机执行，请只添加你信任的 Server。保存后，LocalMind 会发现其中公开的工具并显示在工具中心；你可以在右侧填写 JSON 参数并进行手动测试调用。
+
+当前版本只支持本地 `stdio` 连接，不会自动访问 HTTP/SSE Server。聊天中会把已启用且已发现的 MCP Tool 交给本地 LLM 判断；每次问题最多调用一个工具，调用结果会交回模型并显示在聊天记录中。MCP Server 的配置保存在本机 `data/state/mcp_servers.json`，不应提交任何令牌、密码或私密环境变量。

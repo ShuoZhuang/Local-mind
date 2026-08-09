@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+
 from PySide6.QtCore import QTimer, QSize, Qt, Signal
+from PySide6.QtGui import QTextDocument
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -17,6 +20,35 @@ from PySide6.QtWidgets import (
 from app.ui.motion import reveal
 
 
+class MarkdownLabel(QLabel):
+    """A selectable label that renders the assistant's Markdown through Qt."""
+
+    def __init__(self, markdown: str = "", parent=None):
+        super().__init__(parent)
+        self._markdown = ""
+        self.setWordWrap(True)
+        self.setTextFormat(Qt.TextFormat.RichText)
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.set_markdown(markdown)
+
+    def markdown(self) -> str:
+        return self._markdown
+
+    def set_markdown(self, markdown: str) -> None:
+        self._markdown = str(markdown)
+        document = QTextDocument()
+        document.setDefaultStyleSheet(
+            "body { margin: 0; } "
+            "pre { margin: 6px 0; padding: 8px; background: #111923; color: #d5f4e8; "
+            "border: 1px solid #365269; border-radius: 6px; } "
+            "code { font-family: 'Cascadia Mono', 'Consolas'; color: #bcebd9; } "
+            "blockquote { margin: 6px 0; padding-left: 10px; color: #a9c5d2; "
+            "border-left: 3px solid #4c8f7f; }"
+        )
+        document.setMarkdown(self._markdown)
+        self.setText(document.toHtml())
+
+
 class MessageBubble(QFrame):
     def __init__(self, role: str, text: str, parent=None):
         super().__init__(parent)
@@ -24,9 +56,12 @@ class MessageBubble(QFrame):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.role_label = QLabel("你" if role == "user" else "LocalMind")
         self.role_label.setObjectName("Muted")
-        self.content_label = QLabel(text)
-        self.content_label.setWordWrap(True)
-        self.content_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        if role == "assistant":
+            self.content_label = MarkdownLabel(text)
+        else:
+            self.content_label = QLabel(text)
+            self.content_label.setWordWrap(True)
+            self.content_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 9, 12, 10)
         layout.setSpacing(5)
@@ -44,7 +79,11 @@ class CitationLink(QFrame):
         self.label = QLabel(text)
         self.label.setObjectName("CitationLabel")
         self.label.setWordWrap(True)
-        self.label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        # The parent frame owns the click.  A selectable QLabel consumes the
+        # mouse press first, which makes the source line look clickable but do
+        # nothing in the chat UI.
+        self.label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        self.label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.label)
@@ -191,7 +230,11 @@ class ChatPage(QWidget):
 
     def append_token(self, token: str):
         if getattr(self, "_assistant_bubble", None) is not None:
-            self._assistant_bubble.content_label.setText(self._assistant_bubble.content_label.text() + token)
+            content_label = self._assistant_bubble.content_label
+            if isinstance(content_label, MarkdownLabel):
+                content_label.set_markdown(content_label.markdown() + token)
+            else:
+                content_label.setText(content_label.text() + token)
             self._resize_message_item(self._assistant_item, self._assistant_bubble)
 
     def append_citations(self, citations: list[dict], animate: bool = True):
@@ -210,11 +253,43 @@ class ChatPage(QWidget):
     def append_tool_call(self, tool_call: dict, animate: bool = True) -> None:
         result = tool_call.get("result", {}) if isinstance(tool_call, dict) else {}
         name = str(tool_call.get("name", "未知工具")) if isinstance(tool_call, dict) else "未知工具"
+        source = str(tool_call.get("source", "")) if isinstance(tool_call, dict) else ""
+        arguments = tool_call.get("arguments", {}) if isinstance(tool_call, dict) else {}
+        if not isinstance(arguments, dict):
+            arguments = {}
+        if not isinstance(result, dict):
+            result = {
+                "success": bool(getattr(result, "success", False)),
+                "content": list(getattr(result, "content", []) or []),
+                "structured_content": getattr(result, "structured_content", None),
+                "error": getattr(result, "error", None),
+            }
         success = bool(result.get("success"))
+        lines = [f"工具调用 · {name}"]
+        if source:
+            lines.append(f"来源：{source}")
+        if arguments:
+            lines.append(f"参数：{json.dumps(arguments, ensure_ascii=False)}")
         expression = result.get("expression")
-        value = result.get("result") if success else (result.get("error") or {}).get("message", "调用失败")
-        detail = f"表达式：{expression}\n" if expression else ""
-        label = QLabel(f"工具调用 · {name}\n{detail}结果：{value}")
+        if expression:
+            lines.append(f"表达式：{expression}")
+        if success:
+            structured = result.get("structured_content")
+            content = result.get("content")
+            value = result.get("result")
+            if structured:
+                value = json.dumps(structured, ensure_ascii=False)
+            elif content:
+                value = "\n".join(str(item) for item in content)
+            if value is None:
+                value = "调用成功"
+            lines.append(f"结果：{value}")
+        else:
+            error = result.get("error")
+            if isinstance(error, dict):
+                error = error.get("message")
+            lines.append(f"错误：{error or '调用失败'}")
+        label = QLabel("\n".join(lines))
         label.setObjectName("ToolCallLabel")
         label.setWordWrap(True)
         label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -246,7 +321,7 @@ class ChatPage(QWidget):
         self.messages.clear()
         for message in messages:
             self._append_bubble(message.role, message.content)
-            if message.citations:
+            if message.citations and not message.tool_calls:
                 self.append_citations(message.citations, animate=False)
             for tool_call in message.tool_calls:
                 self.append_tool_call(tool_call, animate=False)

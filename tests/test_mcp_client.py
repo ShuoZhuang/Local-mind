@@ -18,7 +18,7 @@ def local_test_server() -> MCPServerDefinition:
 def test_client_discovers_tools_from_local_stdio_server():
     tools = MCPClientService().discover(local_test_server())
 
-    assert [tool.name for tool in tools] == ["repeat"]
+    assert [tool.name for tool in tools] == ["get_weather"]
     assert tools[0].description == "返回传入的文字。"
     assert tools[0].input_schema["required"] == ["text"]
 
@@ -42,3 +42,12 @@ def test_client_returns_readable_error_when_command_is_missing():
 
     assert result.success is False
     assert "missing-mcp-command" in result.error
+
+
+def test_npx_server_uses_project_local_cache_when_one_is_not_configured(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    server = MCPServerDefinition.new("weather", "npx", ("-y", "weather-mcp"))
+
+    environment = MCPClientService().server_environment(server)
+
+    assert environment["npm_config_cache"] == str(tmp_path / ".npm-cache")

@@ -11,7 +11,8 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from app.config import AppConfig
 from app.main import build_window
-from app.models import ChatSession, ChunkingConfig, DocumentChunk, DocumentRecord
+from app.models import ChatMessage, ChatSession, ChunkingConfig, DocumentChunk, DocumentRecord, MCPServerDefinition, ToolDefinition
+from app.services.chat import ChatEvent
 from app.services.storage import LocalStateStore
 from app.ui.main_window import MainWindow
 from app.ui.chat_page import ChatPage
@@ -47,6 +48,20 @@ def test_main_window_contains_workspace_and_creates_session(tmp_path):
     assert window.current_session.id == first_session_id
     assert window.current_session.id != second_session_id
     assert window.chat_page.title.text() == "新对话"
+    window.close()
+    application.processEvents()
+
+
+def test_main_window_chat_service_uses_shared_tool_registry(tmp_path):
+    application = QApplication.instance() or QApplication([])
+    config = AppConfig.from_root(tmp_path)
+    state = LocalStateStore(config.state_dir)
+    knowledge_base = state.create_knowledge_base("人工智能学习")
+    window = MainWindow(config, state, knowledge_base.id)
+
+    service = window._chat_service()
+
+    assert service.tool_registry is window.tool_registry
     window.close()
     application.processEvents()
 
@@ -293,6 +308,34 @@ def test_chat_page_renders_tool_call_after_assistant_message():
     application.processEvents()
 
 
+def test_chat_page_renders_generic_mcp_tool_call_details():
+    application = QApplication.instance() or QApplication([])
+    page = ChatPage()
+    page.append_tool_call(
+        {
+            "tool_id": "mcp:weather:weather",
+            "name": "天气查询",
+            "source": "天气服务",
+            "arguments": {"city": "上海"},
+            "result": {
+                "success": True,
+                "content": ["28 度"],
+                "structured_content": {"temperature": 28},
+            },
+        }
+    )
+
+    tool_widget = page.messages.itemWidget(page.messages.item(0))
+
+    assert tool_widget is not None
+    assert "天气查询" in tool_widget.text()
+    assert "天气服务" in tool_widget.text()
+    assert "上海" in tool_widget.text()
+    assert "temperature" in tool_widget.text()
+    page.close()
+    application.processEvents()
+
+
 def test_warmup_explicitly_loads_embedding_and_llm(tmp_path, monkeypatch):
     application = QApplication.instance() or QApplication([])
     config = AppConfig.from_root(tmp_path)
@@ -392,6 +435,45 @@ def test_chat_page_source_line_emits_citation_payload():
     assert spy.count() == 1
     assert spy.at(0)[0][0]["document_id"] == "doc-1"
     page.close()
+    application.processEvents()
+
+
+def test_chat_page_does_not_restore_sources_for_messages_that_used_tools():
+    application = QApplication.instance() or QApplication([])
+    page = ChatPage()
+    page.display_messages([
+        ChatMessage(
+            "assistant",
+            "上海现在的时间是 22:27。",
+            citations=[{"file_name": "不应显示.pdf", "document_id": "doc-1"}],
+            tool_calls=[{"name": "get_current_time", "result": {"success": True, "result": "22:27"}}],
+        )
+    ])
+
+    assert page.messages.count() == 2
+    assert all(
+        page.messages.itemWidget(page.messages.item(index)).objectName() != "CitationLink"
+        for index in range(page.messages.count())
+    )
+    page.close()
+    application.processEvents()
+
+
+def test_main_window_does_not_append_sources_when_tool_was_used(tmp_path, monkeypatch):
+    application = QApplication.instance() or QApplication([])
+    config = AppConfig.from_root(tmp_path)
+    state = LocalStateStore(config.state_dir)
+    knowledge_base = state.create_knowledge_base("工具来源显示测试")
+    window = MainWindow(config, state, knowledge_base.id)
+    appended = []
+    monkeypatch.setattr(window.chat_page, "append_citations", lambda citations: appended.append(citations))
+    window._pending_citations = [{"file_name": "不应显示.pdf", "document_id": "doc-1"}]
+    window._pending_tool_calls = [{"name": "get_current_time", "result": {"success": True}}]
+
+    window._handle_chat_event(ChatEvent("done"))
+
+    assert appended == []
+    window.close()
     application.processEvents()
 
 
@@ -603,6 +685,99 @@ def test_import_worker_dispatches_ui_updates_through_main_window_slots():
     assert "self._on_import_worker_finished" in source
     assert "self._on_import_worker_failed" in source
     assert "lambda value: self._handle_import_progress" not in source
+
+
+def test_discover_mcp_tools_refreshes_after_last_server_is_disabled(tmp_path, monkeypatch):
+    application = QApplication.instance() or QApplication([])
+    config = AppConfig.from_root(tmp_path)
+    state = LocalStateStore(config.state_dir)
+    knowledge_base = state.create_knowledge_base("MCP 刷新测试")
+    server = MCPServerDefinition.new("已停用服务", "python", enabled=True)
+    state.save_mcp_server(server)
+    window = MainWindow(config, state, knowledge_base.id)
+
+    stale_tool = ToolDefinition(
+        id=f"mcp:{server.id}:stale",
+        name="旧 MCP 工具",
+        category="MCP",
+        description="应在刷新后移除",
+        capabilities=("MCP", "stdio"),
+        enabled=True,
+        kind="mcp",
+        source=server.name,
+    )
+    window.tool_registry._mcp_tools[stale_tool.id] = stale_tool
+    window._refresh_registered_tools()
+    assert window.tool_center_page.tool(stale_tool.id) is not None
+
+    server.enabled = False
+    state.save_mcp_server(server)
+    events = []
+    original_refresh = window.tool_registry.refresh_mcp_tools
+    original_page_refresh = window._refresh_registered_tools
+    monkeypatch.setattr(
+        window.tool_registry,
+        "refresh_mcp_tools",
+        lambda: events.append("refresh") or original_refresh(),
+    )
+    monkeypatch.setattr(
+        window,
+        "_refresh_registered_tools",
+        lambda: events.append("page") or original_page_refresh(),
+    )
+    monkeypatch.setattr(
+        window,
+        "_start_mcp_worker",
+        lambda *_args: events.append("worker"),
+    )
+    window._discover_mcp_tools()
+
+    assert events == ["refresh", "page"]
+    assert window.tool_center_page.tool(stale_tool.id) is None
+    window.close()
+    application.processEvents()
+
+
+def test_main_window_build_does_not_start_external_mcp_discovery(tmp_path, monkeypatch):
+    application = QApplication.instance() or QApplication([])
+    config = AppConfig.from_root(tmp_path)
+    state = LocalStateStore(config.state_dir)
+    knowledge_base = state.create_knowledge_base("启动隔离测试")
+    server = MCPServerDefinition.new("不会在启动时执行", "npx", ("-y", "some-mcp-server"), enabled=True)
+    state.save_mcp_server(server)
+
+    scheduled_callbacks = []
+    monkeypatch.setattr(
+        "app.ui.main_window.QTimer.singleShot",
+        lambda _delay, callback: scheduled_callbacks.append(callback),
+    )
+
+    window = MainWindow(config, state, knowledge_base.id)
+
+    assert not any(
+        getattr(callback, "__name__", "") == "_discover_mcp_tools"
+        for callback in scheduled_callbacks
+    )
+    window.close()
+    application.processEvents()
+
+
+def test_opening_tool_page_does_not_start_mcp_discovery(tmp_path, monkeypatch):
+    application = QApplication.instance() or QApplication([])
+    config = AppConfig.from_root(tmp_path)
+    state = LocalStateStore(config.state_dir)
+    knowledge_base = state.create_knowledge_base("工具中心缓存")
+    state.save_mcp_server(MCPServerDefinition.new("天气", "npx"))
+    window = MainWindow(config, state, knowledge_base.id)
+    calls = []
+    monkeypatch.setattr(window, "_discover_mcp_tools", lambda: calls.append("discover"))
+
+    window.show_tool_page()
+    application.processEvents()
+
+    assert calls == []
+    window.close()
+    application.processEvents()
 
 
 def test_sidebar_highlight_follows_active_context(tmp_path):

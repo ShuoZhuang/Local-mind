@@ -59,3 +59,20 @@ class WarmupWorker(QObject):
             self.finished.emit()
         except Exception as exc:
             self.failed.emit(str(exc))
+
+
+class MCPWorker(QObject):
+    """Run a bounded MCP discovery or call away from the Qt UI thread."""
+
+    finished = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, operation):
+        super().__init__()
+        self.operation = operation
+
+    def run(self):
+        try:
+            self.finished.emit(self.operation())
+        except Exception as exc:  # pragma: no cover - UI boundary
+            self.failed.emit(str(exc))

@@ -7,6 +7,6 @@
     "provider": "transformers"
   },
   "retrieval_top_k": 5,
-  "max_new_tokens": 512
+  "max_new_tokens": 512,
+  "mcp_servers_file": "data/state/mcp_servers.json"
 }
-

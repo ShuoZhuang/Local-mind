@@ -4,6 +4,7 @@ import asyncio
 import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, TypeVar
 
 from mcp import ClientSession, StdioServerParameters
@@ -38,6 +39,9 @@ class MCPCallResult:
 
 class MCPClientService:
     """Run one trusted local stdio MCP operation in an isolated session."""
+
+    def __init__(self, timeout_seconds: float = 10.0):
+        self.timeout_seconds = max(float(timeout_seconds), 0.1)
 
     def discover(self, server: MCPServerDefinition) -> list[MCPToolInfo]:
         return asyncio.run(self._with_session(server, self._discover))
@@ -74,17 +78,45 @@ class MCPClientService:
             command=server.command,
             args=list(server.args),
             cwd=server.cwd,
-            env={**os.environ, **server.env},
+            env=self.server_environment(server),
         )
         try:
             async with stdio_client(parameters) as (read_stream, write_stream):
                 async with ClientSession(read_stream, write_stream) as session:
-                    await session.initialize()
-                    return await operation(session)
+                    await asyncio.wait_for(
+                        session.initialize(),
+                        timeout=self.timeout_seconds,
+                    )
+                    return await asyncio.wait_for(
+                        operation(session),
+                        timeout=self.timeout_seconds,
+                    )
         except MCPClientError:
             raise
+        except asyncio.TimeoutError as error:
+            raise MCPClientError(
+                f"MCP 服务“{server.name}”在 {self.timeout_seconds:g} 秒内没有响应，已跳过。"
+            ) from error
         except Exception as error:
             raise MCPClientError(self._format_error(server, error)) from error
+
+    @staticmethod
+    def server_environment(server: MCPServerDefinition) -> dict[str, str]:
+        """Build a stable process environment for a trusted stdio MCP server.
+
+        npx otherwise falls back to the user's global npm cache.  That cache
+        is frequently locked by another process on Windows, which prevented
+        the weather server from starting at all.  A project-local cache keeps
+        the installation reusable without depending on that shared directory.
+        """
+        environment = {**os.environ, **server.env}
+        command_name = Path(server.command).name.casefold()
+        if command_name in {"npx", "npx.cmd", "npx.exe"}:
+            environment.setdefault(
+                "npm_config_cache",
+                str(Path(server.cwd or Path.cwd()) / ".npm-cache"),
+            )
+        return environment
 
     @staticmethod
     async def _discover(session: ClientSession) -> list[MCPToolInfo]:

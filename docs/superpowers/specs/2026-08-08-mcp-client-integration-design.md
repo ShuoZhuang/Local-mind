@@ -120,3 +120,7 @@ ToolCenterPage
 5. 不可用 Server 与失败工具会显示可读错误；
 6. 高级计算器仍可在现有聊天链路中正常使用；
 7. 不需要联网即可运行测试。
+
+## 实现状态
+
+首版实现为 LocalMind 的本地 stdio MCP Client：用户在工具中心显式保存可信命令，程序发现 Server 暴露的工具并允许手动传入 JSON 参数测试调用。聊天自动路由、HTTP/SSE transport，以及把 LocalMind 暴露为 MCP Server 均不包含在本版本中。

@@ -17,12 +17,16 @@ from app.services.embeddings import EmbeddingService
 from app.services.ingestion import KnowledgeBaseService
 from app.services.llm import LocalLLM
 from app.services.model_registry import ModelRegistry
+from app.services.mcp_client import MCPClientService
 from app.services.retrieval import RetrievalService
 from app.services.storage import LocalStateStore
+from app.services.tool_registry import ToolRegistry
 from app.services.vector_store import KnowledgeBaseVectorStore
 from app.ui.chat_page import ChatPage
 from app.ui.context_panels import CitationPanel, DocumentDetailPanel, ImportProgressPanel, KnowledgeImportPanel, KnowledgeOverviewPanel
 from app.ui.knowledge_page import KnowledgePage
+from app.ui.mcp_server_dialog import MCPServerDialog
+from app.ui.mcp_tool_display_dialog import MCPToolDisplayDialog
 from app.ui.sidebar import Sidebar
 from app.ui.skills_center_page import SkillsCenterPage, SkillsOverviewPanel
 from app.ui.theme import APP_STYLE
@@ -33,8 +37,7 @@ from app.ui.tool_center_page import (
     ToolDetailsPanel,
 )
 from app.ui.workspace import WorkspaceShell
-from app.ui.workers import ImportWorker, StreamWorker, WarmupWorker
-from tools.calculator import calculator_tool
+from app.ui.workers import ImportWorker, MCPWorker, StreamWorker, WarmupWorker
 
 
 class MainWindow(QMainWindow):
@@ -61,7 +64,9 @@ class MainWindow(QMainWindow):
         self._workers = []
         self._active_stream_worker = None
         self._preheat_in_progress = False
+        self._mcp_discovery_in_progress = False
         self._import_jobs = {}
+        self.tool_registry = ToolRegistry(self.state, MCPClientService())
         self.import_progress: QProgressDialog | None = None
         self._build()
 
@@ -74,7 +79,7 @@ class MainWindow(QMainWindow):
         self.knowledge_page = KnowledgePage()
         self.tool_center_page = ToolCenterPage()
         self.skills_center_page = SkillsCenterPage()
-        self.tool_center_page.set_tools(DEFAULT_TOOL_DEFINITIONS, DEFAULT_LOCAL_CAPABILITIES)
+        self._refresh_registered_tools()
         self.stack = QStackedWidget()
         self.stack.addWidget(self.chat_page)
         self.stack.addWidget(self.knowledge_page)
@@ -116,6 +121,8 @@ class MainWindow(QMainWindow):
         self.sidebar.tool_page_requested.connect(self.show_tool_page)
         self.sidebar.skill_page_requested.connect(self.show_skills_page)
         self.tool_center_page.tool_selected.connect(self._show_tool_details)
+        self.tool_center_page.mcp_servers_requested.connect(self._manage_mcp_servers)
+        self.tool_details_panel.edit_display_requested.connect(self._edit_mcp_tool_display)
         self.tool_details_panel.test_requested.connect(self._test_tool)
         self.chat_page.send_requested.connect(self.receive_query)
         self.chat_page.stop_requested.connect(self.stop_generation)
@@ -175,6 +182,7 @@ class MainWindow(QMainWindow):
         selected_id = self.tool_center_page.selected_tool_id()
         if selected_id:
             self._show_tool_details(selected_id)
+        self._refresh_registered_tools()
 
     def show_skills_page(self):
         self.sidebar.activate_skill_context()
@@ -185,17 +193,103 @@ class MainWindow(QMainWindow):
         self.tool_details_panel.set_tool(self.tool_center_page.tool(tool_id))
         self.workspace.set_context_visible(True)
 
-    def _test_tool(self, tool_id: str) -> None:
-        if tool_id != calculator_tool.name:
+    def _refresh_registered_tools(self) -> None:
+        self.tool_center_page.set_tools(self.tool_registry.list_tools(), DEFAULT_LOCAL_CAPABILITIES)
+
+    def _manage_mcp_servers(self) -> None:
+        dialog = MCPServerDialog(self.state, self)
+        dialog.servers_changed.connect(self._discover_mcp_tools)
+        dialog.exec()
+
+    def _edit_mcp_tool_display(self, tool_id: str) -> None:
+        tool = self.tool_registry.get(tool_id)
+        if tool is None or tool.kind != "mcp":
             return
-        result = calculator_tool.run({"mode": "arithmetic", "expression": "2 + 2"})
-        if result.get("success"):
+        dialog = MCPToolDisplayDialog(self.state, tool, self)
+        if dialog.exec():
+            self.tool_registry.reload_display_metadata()
+            self._refresh_registered_tools()
+            self._show_tool_details(tool_id)
+
+    def _discover_mcp_tools(self) -> None:
+        if self._mcp_discovery_in_progress:
+            return
+        self._mcp_discovery_in_progress = True
+        if not any(server.enabled for server in self.state.list_mcp_servers()):
+            self.tool_registry.refresh_mcp_tools()
+            self._on_mcp_discovery_finished()
+            return
+        self.tool_details_panel.set_test_result("正在发现已启用 MCP Server 中的工具…")
+        self._start_mcp_worker(
+            lambda: self.tool_registry.refresh_mcp_tools(),
+            self._on_mcp_discovery_finished,
+            self._on_mcp_discovery_failed,
+        )
+
+    def _on_mcp_discovery_finished(self, _tools=None) -> None:
+        self._mcp_discovery_in_progress = False
+        self._refresh_registered_tools()
+        errors = self.tool_registry.server_errors()
+        if errors:
             self.tool_details_panel.set_test_result(
-                f"测试通过：2 + 2 = {result.get('result')}"
+                "部分 MCP Server 未连接：" + "；".join(errors.values()), success=False
             )
         else:
-            message = result.get("error", {}).get("message", "未知错误")
-            self.tool_details_panel.set_test_result(f"测试失败：{message}", success=False)
+            self.tool_details_panel.set_test_result("MCP 工具发现完成。")
+
+    def _on_mcp_discovery_failed(self, message: str) -> None:
+        self._mcp_discovery_in_progress = False
+        self._refresh_registered_tools()
+        self.tool_details_panel.set_test_result(
+            f"MCP 工具发现失败：{message}",
+            success=False,
+        )
+
+    def _test_tool(self, tool_id: str, arguments: dict | None = None) -> None:
+        tool = self.tool_registry.get(tool_id)
+        if tool is None:
+            self.tool_details_panel.set_test_result("该工具尚未发现，请重新打开 MCP Server 管理后刷新。", success=False)
+            return
+        self.tool_details_panel.set_test_result("正在测试调用…")
+        if tool_id == "calculator":
+            arguments = {"mode": "arithmetic", "expression": "2 + 2"}
+        self._start_mcp_worker(
+            lambda: self.tool_registry.call(tool_id, arguments or {}),
+            self._on_tool_test_finished,
+        )
+
+    def _on_tool_test_finished(self, result) -> None:
+        if hasattr(result, "success"):
+            if result.success:
+                content = "\n".join(str(item) for item in result.content)
+                self.tool_details_panel.set_test_result(f"测试通过：{content or result.structured_content}")
+            else:
+                self.tool_details_panel.set_test_result(f"测试失败：{result.error}", success=False)
+            return
+        if isinstance(result, dict) and result.get("success"):
+            self.tool_details_panel.set_test_result(f"测试通过：2 + 2 = {result.get('result')}")
+            return
+        message = result.get("error", {}).get("message", "未知错误") if isinstance(result, dict) else "未知错误"
+        self.tool_details_panel.set_test_result(f"测试失败：{message}", success=False)
+
+    def _start_mcp_worker(self, operation, on_finished, on_failed=None) -> None:
+        worker = MCPWorker(operation)
+        thread = QThread(self)
+        worker.moveToThread(thread)
+        self._retain_worker(worker)
+        thread.started.connect(worker.run)
+        worker.finished.connect(on_finished)
+        worker.failed.connect(lambda message: self.tool_details_panel.set_test_result(f"MCP 操作失败：{message}", success=False))
+        if on_failed is not None:
+            worker.failed.connect(on_failed)
+        worker.finished.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(lambda: self._release_worker(worker))
+        self._threads.append(thread)
+        thread.finished.connect(lambda: self._threads.remove(thread) if thread in self._threads else None)
+        thread.start()
 
     def select_model(self, model_id: str):
         self.current_model_id = model_id
@@ -626,7 +720,11 @@ class MainWindow(QMainWindow):
         return self._llms[model_id]
 
     def _chat_service(self):
-        return ChatService(self._retrieval(), self._llm_factory)
+        return ChatService(
+            self._retrieval(),
+            self._llm_factory,
+            tool_registry=self.tool_registry,
+        )
 
     def _start_worker(self, worker: StreamWorker, handler):
         thread = QThread(self)
@@ -699,6 +797,10 @@ class MainWindow(QMainWindow):
         elif event.kind == "tool":
             tool_call = event.payload if isinstance(event.payload, dict) else {}
             self._pending_tool_calls.append(tool_call)
+            # A tool result is the authoritative answer source for this turn.
+            # Clear the knowledge-base citation panel so it does not suggest
+            # that the tool response came from retrieved documents.
+            self.citation_panel.set_empty_state("本轮回答使用了工具，不显示知识库来源。")
             result = tool_call.get("result", {})
             self.chat_page.subtitle.setText(
                 "已使用计算工具" if result.get("success") else "计算工具返回了错误"
@@ -709,7 +811,8 @@ class MainWindow(QMainWindow):
         elif event.kind == "done":
             self.chat_page.set_generation_active(False)
             self._active_stream_worker = None
-            self.chat_page.append_citations(self._pending_citations)
+            if not self._pending_tool_calls:
+                self.chat_page.append_citations(self._pending_citations)
             for tool_call in self._pending_tool_calls:
                 self.chat_page.append_tool_call(tool_call)
             self.current_messages.append(

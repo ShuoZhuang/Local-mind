@@ -12,7 +12,7 @@ async def list_tools(_context, _params) -> types.ListToolsResult:
     return types.ListToolsResult(
         tools=[
             types.Tool(
-                name="repeat",
+                name="get_weather",
                 description="返回传入的文字。",
                 input_schema={
                     "type": "object",

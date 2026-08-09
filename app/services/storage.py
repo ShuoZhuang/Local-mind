@@ -11,6 +11,7 @@ from app.models import (
     DocumentRecord,
     KnowledgeBase,
     MCPServerDefinition,
+    MCPToolDisplayMetadata,
     now_iso,
 )
 
@@ -25,6 +26,8 @@ class LocalStateStore:
         self.chunking_default_path = self.root / "chunking_default.json"
         self.settings_path = self.root / "settings.json"
         self.mcp_servers_path = self.root / "mcp_servers.json"
+        self.mcp_tool_snapshot_path = self.root / "mcp_tool_snapshot.json"
+        self.mcp_tool_display_metadata_path = self.root / "mcp_tool_display_metadata.json"
 
     def load_preheat_models(self) -> bool:
         return bool(self._read_json(self.settings_path, {}).get("preheat_models", False))
@@ -56,6 +59,45 @@ class LocalStateStore:
     def delete_mcp_server(self, server_id: str) -> None:
         servers = [item for item in self.list_mcp_servers() if item.id != server_id]
         self._write_json(self.mcp_servers_path, [item.to_dict() for item in servers])
+
+    def load_mcp_tool_snapshot(self) -> list[dict[str, Any]]:
+        entries = self._read_json(self.mcp_tool_snapshot_path, [])
+        return [dict(item) for item in entries if isinstance(item, dict)] if isinstance(entries, list) else []
+
+    def save_mcp_tool_snapshot(self, entries: list[dict[str, Any]]) -> None:
+        self._write_json(self.mcp_tool_snapshot_path, [dict(entry) for entry in entries])
+
+    def get_mcp_tool_display_metadata(
+        self,
+        server_id: str,
+        tool_name: str,
+    ) -> MCPToolDisplayMetadata | None:
+        for item in self._read_json(self.mcp_tool_display_metadata_path, []):
+            if not isinstance(item, dict):
+                continue
+            try:
+                metadata = MCPToolDisplayMetadata.from_dict(item)
+            except (KeyError, TypeError, ValueError):
+                continue
+            if metadata.server_id == server_id and metadata.tool_name == tool_name:
+                return metadata
+        return None
+
+    def save_mcp_tool_display_metadata(self, metadata: MCPToolDisplayMetadata) -> None:
+        records: dict[tuple[str, str], MCPToolDisplayMetadata] = {}
+        for item in self._read_json(self.mcp_tool_display_metadata_path, []):
+            if not isinstance(item, dict):
+                continue
+            try:
+                record = MCPToolDisplayMetadata.from_dict(item)
+            except (KeyError, TypeError, ValueError):
+                continue
+            records[(record.server_id, record.tool_name)] = record
+        records[(metadata.server_id, metadata.tool_name)] = metadata
+        self._write_json(
+            self.mcp_tool_display_metadata_path,
+            [record.to_dict() for record in records.values()],
+        )
 
     def create_knowledge_base(self, name: str, description: str = "") -> KnowledgeBase:
         item = KnowledgeBase.new(name, description)
